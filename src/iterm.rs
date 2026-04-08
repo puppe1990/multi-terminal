@@ -82,20 +82,37 @@ pub fn run(layout: &Layout) -> Result<(), String> {
 }
 
 pub fn is_supported() -> bool {
-    cfg!(target_os = "macos") && iterm_app_exists()
+    cfg!(target_os = "macos") && (iterm_app_exists() || app_exists_via_mdfind())
 }
 
 fn iterm_app_exists() -> bool {
-    [
-        "/Applications/iTerm.app",
-        "/System/Applications/iTerm.app",
-        &format!(
+    let candidates = vec![
+        "/Applications/iTerm.app".to_string(),
+        "/Applications/iTerm2.app".to_string(),
+        "/System/Applications/iTerm.app".to_string(),
+        format!(
             "{}/Applications/iTerm.app",
             std::env::var("HOME").unwrap_or_default()
         ),
-    ]
-    .iter()
-    .any(|path| Path::new(path).exists())
+        format!(
+            "{}/Applications/iTerm2.app",
+            std::env::var("HOME").unwrap_or_default()
+        ),
+    ];
+
+    app_exists_in_paths(&candidates)
+}
+
+pub fn app_exists_in_paths(paths: &[impl AsRef<str>]) -> bool {
+    paths.iter().any(|path| Path::new(path.as_ref()).exists())
+}
+
+fn app_exists_via_mdfind() -> bool {
+    std::process::Command::new("mdfind")
+        .arg("kMDItemCFBundleIdentifier == 'com.googlecode.iterm2'")
+        .output()
+        .map(|output| !String::from_utf8_lossy(&output.stdout).trim().is_empty())
+        .unwrap_or(false)
 }
 
 fn pane_title(index: usize, command: Option<String>) -> String {

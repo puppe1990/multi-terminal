@@ -1,4 +1,4 @@
-use multi_terminal::iterm::{build_applescript, build_tab_specs};
+use multi_terminal::iterm::{app_exists_in_paths, build_applescript, build_tab_specs};
 use multi_terminal::layout::Layout;
 
 #[test]
@@ -37,4 +37,10 @@ fn applescript_sends_agent_commands_to_tabs() {
     assert!(script.contains("claude --dangerously-skip-permissions"));
     assert!(script.contains("codex --yolo"));
     assert!(script.contains("qwen --yolo"));
+}
+
+#[test]
+fn iterm_path_detection_checks_candidate_paths() {
+    let missing = ["/definitely/missing/iTerm.app"];
+    assert!(!app_exists_in_paths(&missing));
 }
