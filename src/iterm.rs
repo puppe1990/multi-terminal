@@ -32,7 +32,7 @@ pub fn build_applescript(layout: &Layout, cwd: &str) -> Result<String, String> {
 
     let panes = build_tab_specs(layout);
     let mut lines = vec![
-        r#"tell application "iTerm2""#.to_string(),
+        r#"tell application "iTerm""#.to_string(),
         "  activate".to_string(),
         "  create window with default profile".to_string(),
         "  tell current window".to_string(),

@@ -28,6 +28,7 @@ fn build_tab_specs_autoruns_agents_in_remaining_tabs() {
 fn applescript_uses_working_directory_for_every_tab() {
     let script = build_applescript(&Layout::B, "/tmp/my-project").unwrap();
 
+    assert!(script.starts_with("tell application \"iTerm\""));
     assert!(script.contains("cd '/tmp/my-project'"));
     assert!(script.matches("cd '/tmp/my-project'").count() >= 4);
 }
