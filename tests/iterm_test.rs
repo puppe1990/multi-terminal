@@ -28,7 +28,8 @@ fn build_tab_specs_autoruns_agents_in_remaining_tabs() {
 fn applescript_uses_working_directory_for_every_tab() {
     let script = build_applescript(&Layout::B, "/tmp/my-project").unwrap();
 
-    assert!(script.starts_with("tell application \"iTerm\""));
+    assert!(script.starts_with("tell application \"Finder\""));
+    assert!(script.contains("tell application \"iTerm\""));
     assert!(script.contains("cd '/tmp/my-project'"));
     assert!(script.matches("cd '/tmp/my-project'").count() >= 4);
 }
@@ -40,6 +41,7 @@ fn applescript_sends_agent_commands_to_splits() {
     assert!(script.contains("claude --dangerously-skip-permissions"));
     assert!(script.contains("codex --yolo"));
     assert!(script.contains("qwen --yolo"));
+    assert!(script.contains("set pane0 to current session"));
     assert!(script.contains("split horizontally with default profile"));
     assert!(script.contains("split vertically with default profile"));
     assert!(!script.contains("create tab with default profile"));
@@ -62,6 +64,15 @@ fn layout_a_applescript_uses_mixed_split_directions() {
 
     assert!(script.contains("split horizontally with default profile"));
     assert!(script.contains("split vertically with default profile"));
+}
+
+#[test]
+fn applescript_resizes_window_to_screen_bounds() {
+    let script = build_applescript(&Layout::B, "/tmp/my-project").unwrap();
+
+    assert!(script.contains("tell application \"Finder\""));
+    assert!(script.contains("set screenBounds to bounds of window of desktop"));
+    assert!(script.contains("set bounds to screenBounds"));
 }
 
 #[test]

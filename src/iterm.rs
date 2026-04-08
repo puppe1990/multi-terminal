@@ -32,16 +32,22 @@ pub fn build_applescript(layout: &Layout, cwd: &str) -> Result<String, String> {
 
     let panes = build_tab_specs(layout);
     let mut lines = vec![
+        r#"tell application "Finder""#.to_string(),
+        "  set screenBounds to bounds of window of desktop".to_string(),
+        "end tell".to_string(),
         r#"tell application "iTerm""#.to_string(),
         "  activate".to_string(),
         "  create window with default profile".to_string(),
         "  tell current window".to_string(),
+        "    set bounds to screenBounds".to_string(),
         "    set pane0 to current session".to_string(),
     ];
 
     match layout {
         Layout::B => {
-            lines.push("    set pane1 to (split horizontally with default profile)".to_string());
+            lines.push("    tell pane0".to_string());
+            lines.push("      set pane1 to (split horizontally with default profile)".to_string());
+            lines.push("    end tell".to_string());
             lines.push("    tell pane0".to_string());
             lines.push("      set pane2 to (split vertically with default profile)".to_string());
             lines.push("    end tell".to_string());
@@ -50,7 +56,9 @@ pub fn build_applescript(layout: &Layout, cwd: &str) -> Result<String, String> {
             lines.push("    end tell".to_string());
         }
         Layout::A => {
-            lines.push("    set pane1 to (split horizontally with default profile)".to_string());
+            lines.push("    tell pane0".to_string());
+            lines.push("      set pane1 to (split horizontally with default profile)".to_string());
+            lines.push("    end tell".to_string());
             lines.push("    tell pane1".to_string());
             lines.push("      set pane2 to (split vertically with default profile)".to_string());
             lines.push("    end tell".to_string());
