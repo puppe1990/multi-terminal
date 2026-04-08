@@ -21,7 +21,7 @@ impl Command {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PaneConfig {
     pub command: Option<Command>,
 }
