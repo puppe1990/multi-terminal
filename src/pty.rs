@@ -311,7 +311,7 @@ pub fn render_lines(geom: &PaneGeometry, content: &[u8], focused: bool) -> Vec<S
     let horizontal = if focused { '=' } else { '-' };
     let border = format!("+{}+", horizontal.to_string().repeat(inner_width));
 
-    let text = String::from_utf8_lossy(content);
+    let text = normalize_terminal_output(content);
     let lines: Vec<&str> = text.lines().collect();
     let start = lines.len().saturating_sub(inner_height);
 
@@ -331,6 +331,44 @@ pub fn render_lines(geom: &PaneGeometry, content: &[u8], focused: bool) -> Vec<S
 
     rendered.push(border);
     rendered
+}
+
+pub fn normalize_terminal_output(content: &[u8]) -> String {
+    let text = String::from_utf8_lossy(content);
+    let mut normalized = String::new();
+    let mut chars = text.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        match ch {
+            '\u{1b}' => match chars.peek().copied() {
+                Some('[') => {
+                    chars.next();
+                    while let Some(next) = chars.next() {
+                        if ('@'..='~').contains(&next) {
+                            break;
+                        }
+                    }
+                }
+                Some(']') => {
+                    chars.next();
+                    let mut prev = '\0';
+                    while let Some(next) = chars.next() {
+                        if next == '\u{7}' || (prev == '\u{1b}' && next == '\\') {
+                            break;
+                        }
+                        prev = next;
+                    }
+                }
+                _ => {}
+            },
+            '\r' => {}
+            '\n' | '\t' => normalized.push(ch),
+            ch if ch.is_control() => {}
+            _ => normalized.push(ch),
+        }
+    }
+
+    normalized
 }
 
 pub fn invalidate_all_panes(last_outputs: &mut [Option<Vec<u8>>]) {

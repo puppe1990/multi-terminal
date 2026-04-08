@@ -1,6 +1,7 @@
 use multi_terminal::layout::Layout;
 use multi_terminal::pty::{
-    command_for_pane, compute_geometry, invalidate_all_panes, render_lines, PaneGeometry,
+    command_for_pane, compute_geometry, invalidate_all_panes, normalize_terminal_output,
+    render_lines, PaneGeometry,
 };
 
 #[test]
@@ -67,4 +68,30 @@ fn invalidating_panes_marks_all_buffers_for_redraw() {
     invalidate_all_panes(&mut buffers);
 
     assert_eq!(buffers, vec![None, None, None]);
+}
+
+#[test]
+fn normalize_terminal_output_strips_ansi_sequences() {
+    let raw = b"\x1b[2J\x1b[Hhello\x1b[31m red\x1b[0m";
+
+    let normalized = normalize_terminal_output(raw);
+
+    assert_eq!(normalized, "hello red");
+}
+
+#[test]
+fn render_lines_ignores_terminal_control_bytes() {
+    let geom = PaneGeometry {
+        row: 0,
+        col: 0,
+        width: 14,
+        height: 4,
+    };
+
+    let lines = render_lines(&geom, b"\x1b[2J\x1b[Hhi\r\nthere", false);
+
+    assert_eq!(lines[0], "+------------+");
+    assert_eq!(lines[1], "|hi          |");
+    assert_eq!(lines[2], "|there       |");
+    assert_eq!(lines[3], "+------------+");
 }
