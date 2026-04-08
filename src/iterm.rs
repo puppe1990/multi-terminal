@@ -20,7 +20,7 @@ pub fn build_tab_specs(layout_mode: &LayoutMode, agents: &[AgentConfig]) -> Vec<
         LayoutMode::LegacyB => crate::layout::Layout::B,
         LayoutMode::Dynamic { .. } => crate::layout::Layout::B, // Default to B for now
     };
-    
+
     layout
         .panes(agents)
         .into_iter()
@@ -82,14 +82,12 @@ pub fn build_applescript(
                 );
                 lines.push("    end tell".to_string());
                 lines.push("    tell pane0".to_string());
-                lines.push(
-                    "      set pane2 to (split vertically with default profile)".to_string(),
-                );
+                lines
+                    .push("      set pane2 to (split vertically with default profile)".to_string());
                 lines.push("    end tell".to_string());
                 lines.push("    tell pane1".to_string());
-                lines.push(
-                    "      set pane3 to (split vertically with default profile)".to_string(),
-                );
+                lines
+                    .push("      set pane3 to (split vertically with default profile)".to_string());
                 lines.push("    end tell".to_string());
             }
             crate::layout::Layout::A => {
@@ -99,9 +97,8 @@ pub fn build_applescript(
                 );
                 lines.push("    end tell".to_string());
                 lines.push("    tell pane1".to_string());
-                lines.push(
-                    "      set pane2 to (split vertically with default profile)".to_string(),
-                );
+                lines
+                    .push("      set pane2 to (split vertically with default profile)".to_string());
                 lines.push("    end tell".to_string());
                 lines.push("    tell pane2".to_string());
                 lines.push(
