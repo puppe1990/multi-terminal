@@ -24,6 +24,33 @@ Ou, após compilar:
 ./target/debug/multi-terminal --layout a
 ```
 
+## Instalacao Global
+
+Para instalar o binario globalmente na sua maquina:
+
+```bash
+cargo install --path .
+```
+
+Depois disso, em qualquer pasta:
+
+```bash
+multi-terminal
+multi-terminal --layout a
+```
+
+Se preferir instalar direto do GitHub:
+
+```bash
+cargo install --git https://github.com/puppe1990/multi-terminal
+```
+
+Tambem existe um atalho local no repo:
+
+```bash
+./install
+```
+
 ## Comandos por painel
 
 ### Layout B
