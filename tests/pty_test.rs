@@ -20,7 +20,7 @@ fn layout_b_geometry_pane_sizes_cover_terminal() {
     let left_width = geom[0].width;
     let right_width = geom[1].width;
     // +1 para a borda
-    assert!(left_width + right_width + 1 <= 100);
+    assert!(left_width + right_width < 100);
 }
 
 #[test]
