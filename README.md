@@ -1,94 +1,164 @@
 # multi-terminal
 
-CLI em Rust para abrir 4 painéis no terminal com agentes pré-configurados.
+CLI em Rust para abrir 4 painéis de terminal com agentes de IA e comandos customizáveis.
 
 ## O que faz
 
-- No macOS, prefere abrir uma nova janela com 4 abas separadas:
-  - `iTerm2` quando instalado
-  - `Terminal.app` como fallback
-- Fora disso, usa `tmux` quando disponível para montar os painéis no terminal atual.
-- Se nada disso estiver disponível, cai para um fallback em Rust com `portable-pty` + `crossterm`.
 - Suporta dois layouts:
-  - `b` (padrão)
-  - `a`
+  - `b` (padrão): grade 2x2
+  - `a`: coluna esquerda alta + três painéis na direita
+- Inicia, por padrão:
+  - pane 1: shell livre
+  - pane 2: `claude --dangerously-skip-permissions`
+  - pane 3: `codex --yolo`
+  - pane 4: `qwen --yolo`
+- Permite desabilitar agentes, sobrescrever comandos por painel e definir títulos customizados.
+- Permite salvar layouts nomeados e recarregá-los depois.
 
-## Uso
+## Estratégia de execução
+
+- No macOS:
+  - usa `iTerm2` quando disponível
+  - tenta instalar `iTerm2` automaticamente via Homebrew quando não estiver instalado
+- Fora disso, ou se o fluxo do `iTerm2` falhar:
+  - usa `tmux` quando disponível
+  - cai para um fallback TUI em Rust com `portable-pty` + `crossterm`
+
+O terminal precisa ter no mínimo `80x24`.
+
+## Instalação
+
+### Rodando localmente
 
 ```bash
 cargo run
 cargo run -- --layout a
 ```
 
-Ou, após compilar:
+### Binário compilado
 
 ```bash
 ./target/debug/multi-terminal
 ./target/debug/multi-terminal --layout a
 ```
 
-## Modos de Execucao
-
-### macOS com abas automaticas
-
-Se `iTerm2` ou `Terminal.app` estiver instalado, o comando abre uma nova janela com 4 abas no mesmo diretorio atual e executa automaticamente:
-
-- Aba 1: shell livre
-- Aba 2: `claude --dangerously-skip-permissions`
-- Aba 3: `codex --yolo`
-- Aba 4: `qwen --yolo`
-
-Ordem de preferencia:
-
-1. `iTerm2`
-2. `Terminal.app`
-3. `tmux`
-4. fallback PTY
-
-Para a experiencia mais proxima do que voce descreveu, use macOS com `iTerm2` instalado.
-
-## Instalacao Global
-
-Para instalar o binario globalmente na sua maquina:
+### Instalação global
 
 ```bash
 cargo install --path .
 ```
 
-Depois disso, em qualquer pasta:
+Depois:
 
 ```bash
 multi-terminal
 multi-terminal --layout a
 ```
 
-Se preferir instalar direto do GitHub:
-
-```bash
-cargo install --git https://github.com/puppe1990/multi-terminal
-```
-
-Tambem existe um atalho local no repo:
+Atalho local do repositório:
 
 ```bash
 ./install
 ```
 
-## Comandos por painel
+## Uso básico
+
+```bash
+multi-terminal
+multi-terminal --layout a
+multi-terminal --maximize
+```
+
+## Flags principais
+
+### Desabilitar agentes padrão
+
+```bash
+multi-terminal --no-claude
+multi-terminal --no-codex --no-qwen
+```
+
+### Sobrescrever comandos por painel
+
+Os painéis são indexados de `1` a `4`:
+
+- layout `b`: `top-left`, `top-right`, `bottom-left`, `bottom-right`
+- layout `a`: `left`, `right-top`, `right-bottom-left`, `right-bottom-right`
+
+```bash
+multi-terminal \
+  --pane1 "lazygit" \
+  --pane2 "npm run dev" \
+  --pane3 "cargo test -- --nocapture" \
+  --pane4 "htop"
+```
+
+### Definir títulos customizados
+
+```bash
+multi-terminal \
+  --title1 "Git" \
+  --title2 "App" \
+  --title3 "Tests" \
+  --title4 "Monitor"
+```
+
+Se `--paneN` e `--titleN` forem usados juntos, o título customizado é aplicado ao comando daquele painel.
+
+## Layouts salvos
+
+Salvar uma configuração:
+
+```bash
+multi-terminal \
+  --layout a \
+  --pane2 "npm run dev" \
+  --title2 "App" \
+  --maximize \
+  --save team
+```
+
+Listar layouts salvos:
+
+```bash
+multi-terminal --list-layouts
+```
+
+Carregar um layout salvo:
+
+```bash
+multi-terminal --load team
+```
+
+Overrides via CLI continuam valendo ao carregar um layout salvo:
+
+```bash
+multi-terminal --load team --pane2 "lazygit" --title2 "Git" --no-qwen
+```
+
+Os layouts são persistidos no diretório de configuração do sistema em `multi-terminal/layouts.json`.
+
+## Layouts padrão
 
 ### Layout B
 
-- Pane 0: shell livre
-- Pane 1: `claude --dangerously-skip-permissions`
-- Pane 2: `codex --yolo`
-- Pane 3: `qwen --yolo`
+```text
+┌──────────────────┬──────────────────────────────┐
+│ Shell            │ Claude AI                    │
+├──────────────────┼──────────────────────────────┤
+│ Codex            │ Qwen                         │
+└──────────────────┴──────────────────────────────┘
+```
 
 ### Layout A
 
-- Pane 0: shell livre
-- Pane 1: `claude --dangerously-skip-permissions`
-- Pane 2: `codex --yolo`
-- Pane 3: `qwen --yolo`
+```text
+┌──────────────┬──────────────────────────────────┐
+│ Shell        │ Claude AI                        │
+│              ├──────────────────────────────────┤
+│              │ Codex            │ Qwen          │
+└──────────────┴──────────────────────────────────┘
+```
 
 ## Desenvolvimento
 

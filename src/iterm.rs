@@ -1,4 +1,4 @@
-use crate::layout::Layout;
+use crate::layout::{AgentConfig, Layout};
 use std::path::Path;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -13,24 +13,32 @@ pub struct ShellCommand {
     pub args: Vec<String>,
 }
 
-pub fn build_tab_specs(layout: &Layout) -> Vec<TabSpec> {
+pub fn build_tab_specs(layout: &Layout, agents: &[AgentConfig]) -> Vec<TabSpec> {
     layout
-        .panes()
+        .panes(agents)
         .into_iter()
         .enumerate()
-        .map(|(index, pane)| TabSpec {
-            title: pane_title(index, pane.command.as_ref().map(|cmd| cmd.to_shell_string())),
-            command: pane.command.map(|cmd| cmd.to_shell_string()),
+        .map(|(index, agent)| {
+            let cmd = agent.effective_command();
+            TabSpec {
+                title: pane_title(index, &agent),
+                command: cmd.map(|c| c.to_shell_string()),
+            }
         })
         .collect()
 }
 
-pub fn build_applescript(layout: &Layout, cwd: &str) -> Result<String, String> {
+pub fn build_applescript(
+    layout: &Layout,
+    agents: &[AgentConfig],
+    maximize: bool,
+    cwd: &str,
+) -> Result<String, String> {
     if cwd.is_empty() {
-        return Err("diretorio atual vazio".to_string());
+        return Err("current directory empty".to_string());
     }
 
-    let panes = build_tab_specs(layout);
+    let panes = build_tab_specs(layout, agents);
     let mut lines = vec![
         r#"tell application "Finder""#.to_string(),
         "  set screenBounds to bounds of window of desktop".to_string(),
@@ -39,9 +47,13 @@ pub fn build_applescript(layout: &Layout, cwd: &str) -> Result<String, String> {
         "  activate".to_string(),
         "  create window with default profile".to_string(),
         "  tell current window".to_string(),
-        "    set bounds to screenBounds".to_string(),
-        "    set pane0 to current session".to_string(),
     ];
+
+    if maximize {
+        lines.push("    set bounds to screenBounds".to_string());
+    }
+
+    lines.push("    set pane0 to current session".to_string());
 
     match layout {
         Layout::B => {
@@ -68,6 +80,16 @@ pub fn build_applescript(layout: &Layout, cwd: &str) -> Result<String, String> {
         }
     }
 
+    // Set custom names for each pane
+    for (index, pane) in panes.iter().enumerate() {
+        lines.push(format!("    tell pane{}", index));
+        lines.push(format!(
+            "      set name to \"{}\"",
+            apple_escape(&pane.title)
+        ));
+        lines.push("    end tell".to_string());
+    }
+
     for (index, pane) in panes.iter().enumerate() {
         lines.push(format!("    tell pane{}", index));
         lines.push(format!(
@@ -75,10 +97,7 @@ pub fn build_applescript(layout: &Layout, cwd: &str) -> Result<String, String> {
             apple_escape(&cd_command(cwd))
         ));
         if let Some(command) = &pane.command {
-            lines.push(format!(
-                "      write text \"{}\"",
-                apple_escape(command)
-            ));
+            lines.push(format!("      write text \"{}\"", apple_escape(command)));
         }
         lines.push("    end tell".to_string());
     }
@@ -88,24 +107,25 @@ pub fn build_applescript(layout: &Layout, cwd: &str) -> Result<String, String> {
     Ok(lines.join("\n"))
 }
 
-pub fn run(layout: &Layout) -> Result<(), String> {
-    let cwd = std::env::current_dir().map_err(|e| format!("falha ao obter diretorio atual: {e}"))?;
+pub fn run(layout: &Layout, agents: &[AgentConfig], maximize: bool) -> Result<(), String> {
+    let cwd =
+        std::env::current_dir().map_err(|e| format!("failed to get current directory: {e}"))?;
     let cwd = cwd
         .to_str()
-        .ok_or_else(|| "diretorio atual contem caracteres invalidos".to_string())?;
+        .ok_or_else(|| "current directory contains invalid characters".to_string())?;
 
-    let script = build_applescript(layout, cwd)?;
+    let script = build_applescript(layout, agents, maximize, cwd)?;
 
     let status = std::process::Command::new("osascript")
         .arg("-e")
         .arg(script)
         .status()
-        .map_err(|e| format!("falha ao executar osascript: {e}"))?;
+        .map_err(|e| format!("failed to execute osascript: {e}"))?;
 
     if status.success() {
         Ok(())
     } else {
-        Err(format!("AppleScript do iTerm2 falhou com status {status}"))
+        Err(format!("iTerm2 AppleScript failed with status {status}"))
     }
 }
 
@@ -119,28 +139,28 @@ pub fn ensure_installed() -> Result<(), String> {
     }
 
     let brew = which::which("brew")
-        .map_err(|_| "iTerm2 nao encontrado e Homebrew nao esta instalado".to_string())?;
+        .map_err(|_| "iTerm2 not found and Homebrew not installed".to_string())?;
 
     let install = build_brew_install_command(
         brew.to_str()
-            .ok_or_else(|| "caminho do brew contem caracteres invalidos".to_string())?,
+            .ok_or_else(|| "brew path contains invalid characters".to_string())?,
     );
 
     let status = std::process::Command::new(&install.program)
         .args(&install.args)
         .status()
-        .map_err(|e| format!("falha ao executar instalacao do iTerm2 via brew: {e}"))?;
+        .map_err(|e| format!("failed to install iTerm2 via brew: {e}"))?;
 
     if !status.success() {
         return Err(format!(
-            "instalacao automatica do iTerm2 falhou com status {status}"
+            "automatic iTerm2 installation failed with status {status}"
         ));
     }
 
     if is_supported() {
         Ok(())
     } else {
-        Err("iTerm2 foi instalado, mas ainda nao ficou detectavel pelo sistema".to_string())
+        Err("iTerm2 was installed but still not detectable".to_string())
     }
 }
 
@@ -185,19 +205,8 @@ fn app_exists_via_mdfind() -> bool {
         .unwrap_or(false)
 }
 
-fn pane_title(index: usize, command: Option<String>) -> String {
-    if index == 0 {
-        "shell".to_string()
-    } else {
-        match command {
-            Some(command) => command
-                .split_whitespace()
-                .next()
-                .unwrap_or("shell")
-                .to_string(),
-            None => "shell".to_string(),
-        }
-    }
+fn pane_title(_index: usize, agent: &AgentConfig) -> String {
+    agent.effective_title()
 }
 
 fn cd_command(cwd: &str) -> String {

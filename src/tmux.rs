@@ -1,10 +1,10 @@
-use crate::layout::Layout;
+use crate::layout::{AgentConfig, Layout};
 
-/// Constrói a sequência de comandos tmux shell para o layout dado.
-/// session_name: nome da sessão tmux a criar.
-pub fn build_commands(layout: &Layout, session_name: &str) -> Vec<String> {
+/// Builds the tmux shell command sequence for the given layout.
+/// session_name: name of the tmux session to create.
+pub fn build_commands(layout: &Layout, agents: &[AgentConfig], session_name: &str) -> Vec<String> {
     let mut cmds = vec![
-        // Cria nova sessão detached
+        // Create new detached session
         format!(
             "tmux new-session -d -s {} -x \"$(tput cols)\" -y \"$(tput lines)\"",
             session_name
@@ -13,65 +13,50 @@ pub fn build_commands(layout: &Layout, session_name: &str) -> Vec<String> {
 
     match layout {
         Layout::B => {
-            // Layout B: 2x2 simétrico
-            // Divide em esq/dir
+            // Layout B: 2x2 symmetric
+            // Split left/right
             cmds.push(format!("tmux split-window -h -t {}:0.0", session_name));
-            // Divide esq em cima/baixo
+            // Split left into top/bottom
             cmds.push(format!("tmux split-window -v -t {}:0.0", session_name));
-            // Divide dir em cima/baixo
+            // Split right into top/bottom
             cmds.push(format!("tmux split-window -v -t {}:0.1", session_name));
-            // Envia comandos: pane 1=claude, pane 2=codex, pane 3=qwen
-            // (pane 0 fica livre)
-            cmds.push(format!(
-                "tmux send-keys -t {}:0.1 'claude --dangerously-skip-permissions' Enter",
-                session_name
-            ));
-            cmds.push(format!(
-                "tmux send-keys -t {}:0.2 'codex --yolo' Enter",
-                session_name
-            ));
-            cmds.push(format!(
-                "tmux send-keys -t {}:0.3 'qwen --yolo' Enter",
-                session_name
-            ));
         }
         Layout::A => {
-            // Layout A: esq ocupa altura total, dir divide em cima/baixo/baixo
-            // Divide em esq/dir
+            // Layout A: left full height, right split top/bottom/bottom
+            // Split left/right
             cmds.push(format!("tmux split-window -h -t {}:0.0", session_name));
-            // Divide dir em cima/baixo
+            // Split right into top/bottom
             cmds.push(format!("tmux split-window -v -t {}:0.1", session_name));
-            // Divide dir-baixo em esq/dir (codex | qwen)
+            // Split right-bottom into left/right (codex | qwen)
             cmds.push(format!("tmux split-window -h -t {}:0.2", session_name));
-            // Envia comandos: pane 1=claude, pane 2=codex, pane 3=qwen
+        }
+    }
+
+    // Send commands to each pane
+    for (index, agent) in agents.iter().enumerate() {
+        if let Some(cmd) = agent.effective_command() {
             cmds.push(format!(
-                "tmux send-keys -t {}:0.1 'claude --dangerously-skip-permissions' Enter",
-                session_name
-            ));
-            cmds.push(format!(
-                "tmux send-keys -t {}:0.2 'codex --yolo' Enter",
-                session_name
-            ));
-            cmds.push(format!(
-                "tmux send-keys -t {}:0.3 'qwen --yolo' Enter",
-                session_name
+                "tmux send-keys -t {}:0.{} '{}' Enter",
+                session_name,
+                index,
+                cmd.to_shell_string()
             ));
         }
     }
 
-    // Seleciona pane 0 (livre) e faz attach
+    // Select pane 0 and attach
     cmds.push(format!("tmux select-pane -t {}:0.0", session_name));
     cmds.push(format!("tmux attach-session -t {}", session_name));
 
     cmds
 }
 
-/// Executa a sequência de comandos tmux para o layout dado.
-/// Retorna Err com mensagem se algum comando falhar (exceto kill-session).
-pub fn run(layout: &Layout) -> Result<(), String> {
+/// Executes the tmux command sequence for the given layout.
+/// Returns Err with message if any command fails (except kill-session).
+pub fn run(layout: &Layout, agents: &[AgentConfig]) -> Result<(), String> {
     let session = "multi-terminal";
 
-    // Kill session se existir (fire-and-forget)
+    // Kill session if exists (fire-and-forget)
     let _ = std::process::Command::new("sh")
         .arg("-c")
         .arg(format!(
@@ -80,18 +65,18 @@ pub fn run(layout: &Layout) -> Result<(), String> {
         ))
         .status();
 
-    let commands = build_commands(layout, session);
+    let commands = build_commands(layout, agents, session);
 
     for cmd in &commands {
         let status = std::process::Command::new("sh")
             .arg("-c")
             .arg(cmd)
             .status()
-            .map_err(|e| format!("falha ao executar '{}': {}", cmd, e))?;
+            .map_err(|e| format!("failed to execute '{}': {}", cmd, e))?;
 
-        // attach-session assume controle do terminal — se falhar, é erro real
+        // attach-session takes over terminal — if it fails, it's a real error
         if !status.success() {
-            return Err(format!("comando tmux falhou: {}", cmd));
+            return Err(format!("tmux command failed: {}", cmd));
         }
     }
 

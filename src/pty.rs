@@ -1,4 +1,4 @@
-use crate::layout::{Command as PaneCommand, Layout, PaneConfig};
+use crate::layout::{AgentConfig, Command as PaneCommand, Layout};
 use crossterm::{
     cursor,
     event::{self, Event, KeyCode, KeyModifiers},
@@ -19,8 +19,8 @@ pub struct PaneGeometry {
     pub height: u16,
 }
 
-/// Calcula a geometria dos 4 painéis para o terminal de tamanho (cols x rows).
-/// Retorna 4 geometrias na ordem: [0=livre, 1=claude, 2=codex, 3=qwen]
+/// Calculates geometry for 4 panes given terminal size (cols x rows).
+/// Returns 4 geometries in pane order.
 pub fn compute_geometry(layout: &Layout, cols: u16, rows: u16) -> Vec<PaneGeometry> {
     match layout {
         Layout::B => {
@@ -99,9 +99,15 @@ pub fn compute_geometry(layout: &Layout, cols: u16, rows: u16) -> Vec<PaneGeomet
     }
 }
 
-pub fn command_for_pane(config: &PaneConfig) -> PaneCommand {
-    let _ = config;
-    default_shell_command()
+pub fn command_for_pane(config: &AgentConfig) -> PaneCommand {
+    match &config.agent_type {
+        crate::layout::AgentType::Custom(command) if config.command.is_none() => {
+            shell_command_for(command)
+        }
+        _ => config
+            .effective_command()
+            .unwrap_or_else(default_shell_command),
+    }
 }
 
 fn default_shell_command() -> PaneCommand {
@@ -109,6 +115,14 @@ fn default_shell_command() -> PaneCommand {
     PaneCommand {
         program: shell,
         args: Vec::new(),
+    }
+}
+
+fn shell_command_for(command: &str) -> PaneCommand {
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "sh".to_string());
+    PaneCommand {
+        program: shell,
+        args: vec!["-lc".to_string(), command.to_string()],
     }
 }
 
@@ -139,10 +153,10 @@ struct Pane {
     writer: Box<dyn Write + Send>,
 }
 
-pub fn run(layout: &Layout) -> Result<(), String> {
+pub fn run(layout: &Layout, agents: &[AgentConfig]) -> Result<(), String> {
     let (cols, rows) = terminal::size().map_err(|e| e.to_string())?;
     let geometries = compute_geometry(layout, cols, rows);
-    let pane_configs = layout.panes();
+    let pane_configs = layout.panes(agents);
 
     let pty_system = native_pty_system();
     let mut panes: Vec<Pane> = Vec::new();
@@ -160,7 +174,7 @@ pub fn run(layout: &Layout) -> Result<(), String> {
 
         let pair = pty_system
             .openpty(pty_size)
-            .map_err(|e| format!("falha ao abrir PTY para pane {}: {}", i, e))?;
+            .map_err(|e| format!("failed to open PTY for pane {}: {}", i, e))?;
 
         let mut builder = CommandBuilder::new(&cmd.program);
         for arg in &cmd.args {
@@ -172,14 +186,13 @@ pub fn run(layout: &Layout) -> Result<(), String> {
             {
                 let mut lock = output.lock().unwrap();
                 lock.extend_from_slice(
-                    format!("Aviso: nao foi possivel iniciar '{}': {}\n", cmd.program, e)
-                        .as_bytes(),
+                    format!("Warning: could not start '{}': {}\n", cmd.program, e).as_bytes(),
                 );
             }
 
             panes.push(Pane {
                 geom: geom.clone(),
-                title: pane_title(i, config),
+                title: config.effective_title(),
                 output,
                 writer: Box::new(NullWriter),
             });
@@ -189,7 +202,7 @@ pub fn run(layout: &Layout) -> Result<(), String> {
         let mut reader = pair
             .master
             .try_clone_reader()
-            .map_err(|e| format!("falha ao clonar reader PTY: {}", e))?;
+            .map_err(|e| format!("failed to clone PTY reader: {}", e))?;
 
         let output_clone = Arc::clone(&output);
         thread::spawn(move || {
@@ -200,7 +213,7 @@ pub fn run(layout: &Layout) -> Result<(), String> {
                     Ok(n) => {
                         let mut lock = output_clone.lock().unwrap();
                         lock.extend_from_slice(&buf[..n]);
-                        // Mantém apenas os últimos 64KB
+                        // Keep only last 64KB
                         if lock.len() > 65536 {
                             let keep = lock.len() - 65536;
                             lock.drain(..keep);
@@ -213,17 +226,17 @@ pub fn run(layout: &Layout) -> Result<(), String> {
         let writer = pair
             .master
             .take_writer()
-            .map_err(|e| format!("falha ao obter writer PTY: {}", e))?;
+            .map_err(|e| format!("failed to get PTY writer: {}", e))?;
 
         panes.push(Pane {
             geom: geom.clone(),
-            title: pane_title(i, config),
+            title: config.effective_title(),
             output,
             writer,
         });
     }
 
-    // Entra em modo raw e tela alternativa
+    // Enter raw mode and alternate screen
     terminal::enable_raw_mode().map_err(|e| e.to_string())?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, cursor::Hide).map_err(|e| e.to_string())?;
@@ -368,17 +381,6 @@ fn border_line(inner_width: usize, title: &str, horizontal: char) -> String {
     )
 }
 
-fn pane_title(index: usize, config: &PaneConfig) -> String {
-    if index == 0 {
-        return "shell".to_string();
-    }
-
-    match &config.command {
-        Some(command) => format!("shell | run {}", command.to_shell_string()),
-        None => "shell".to_string(),
-    }
-}
-
 pub fn normalize_terminal_output(content: &[u8]) -> String {
     let text = String::from_utf8_lossy(content);
     let mut normalized = String::new();
@@ -389,7 +391,7 @@ pub fn normalize_terminal_output(content: &[u8]) -> String {
             '\u{1b}' => match chars.peek().copied() {
                 Some('[') => {
                     chars.next();
-                    while let Some(next) = chars.next() {
+                    for next in chars.by_ref() {
                         if ('@'..='~').contains(&next) {
                             break;
                         }
@@ -398,7 +400,7 @@ pub fn normalize_terminal_output(content: &[u8]) -> String {
                 Some(']') => {
                     chars.next();
                     let mut prev = '\0';
-                    while let Some(next) = chars.next() {
+                    for next in chars.by_ref() {
                         if next == '\u{7}' || (prev == '\u{1b}' && next == '\\') {
                             break;
                         }

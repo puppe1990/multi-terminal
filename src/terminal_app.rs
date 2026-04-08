@@ -1,22 +1,43 @@
-use crate::iterm::build_tab_specs;
-use crate::layout::Layout;
+use crate::layout::{AgentConfig, Layout};
 
-pub fn build_applescript(layout: &Layout, cwd: &str) -> Result<String, String> {
+pub fn build_applescript(
+    layout: &Layout,
+    agents: &[AgentConfig],
+    cwd: &str,
+) -> Result<String, String> {
     if cwd.is_empty() {
-        return Err("diretorio atual vazio".to_string());
+        return Err("current directory empty".to_string());
     }
 
-    let tabs = build_tab_specs(layout);
+    let panes: Vec<_> = layout
+        .panes(agents)
+        .into_iter()
+        .map(|agent| {
+            let cmd = agent.effective_command();
+            let title = agent.effective_title();
+            (title, cmd)
+        })
+        .collect();
+
     let mut lines = vec![
         r#"tell application "Terminal""#.to_string(),
         "  activate".to_string(),
-        format!("  do script \"{}\"", apple_escape(&tab_command(cwd, None))),
+        format!(
+            "  do script \"{}\"",
+            apple_escape(&pane_command(
+                cwd,
+                panes[0].1.as_ref().map(|c| c.to_shell_string()).as_deref()
+            ))
+        ),
     ];
 
-    for tab in tabs.iter().skip(1) {
+    for (_, cmd) in panes.iter().skip(1) {
         lines.push(format!(
             "  do script \"{}\" in front window",
-            apple_escape(&tab_command(cwd, tab.command.as_deref()))
+            apple_escape(&pane_command(
+                cwd,
+                cmd.as_ref().map(|c| c.to_shell_string()).as_deref()
+            ))
         ));
     }
 
@@ -24,24 +45,27 @@ pub fn build_applescript(layout: &Layout, cwd: &str) -> Result<String, String> {
     Ok(lines.join("\n"))
 }
 
-pub fn run(layout: &Layout) -> Result<(), String> {
-    let cwd = std::env::current_dir().map_err(|e| format!("falha ao obter diretorio atual: {e}"))?;
+pub fn run(layout: &Layout, agents: &[AgentConfig]) -> Result<(), String> {
+    let cwd =
+        std::env::current_dir().map_err(|e| format!("failed to get current directory: {e}"))?;
     let cwd = cwd
         .to_str()
-        .ok_or_else(|| "diretorio atual contem caracteres invalidos".to_string())?;
+        .ok_or_else(|| "current directory contains invalid characters".to_string())?;
 
-    let script = build_applescript(layout, cwd)?;
+    let script = build_applescript(layout, agents, cwd)?;
 
     let status = std::process::Command::new("osascript")
         .arg("-e")
         .arg(script)
         .status()
-        .map_err(|e| format!("falha ao executar osascript: {e}"))?;
+        .map_err(|e| format!("failed to execute osascript: {e}"))?;
 
     if status.success() {
         Ok(())
     } else {
-        Err(format!("AppleScript do Terminal.app falhou com status {status}"))
+        Err(format!(
+            "Terminal.app AppleScript failed with status {status}"
+        ))
     }
 }
 
@@ -61,7 +85,7 @@ fn cd_command(cwd: &str) -> String {
     format!("cd '{}'", cwd.replace('\'', r"'\''"))
 }
 
-fn tab_command(cwd: &str, command: Option<&str>) -> String {
+fn pane_command(cwd: &str, command: Option<&str>) -> String {
     match command {
         Some(command) => format!("{}; {}", cd_command(cwd), command),
         None => cd_command(cwd),

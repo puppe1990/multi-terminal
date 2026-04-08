@@ -1,4 +1,4 @@
-use multi_terminal::layout::Layout;
+use multi_terminal::layout::{AgentConfig, AgentType, Layout};
 use multi_terminal::pty::{
     command_for_pane, compute_geometry, invalidate_all_panes, normalize_terminal_output,
     render_lines, PaneGeometry,
@@ -19,7 +19,7 @@ fn layout_b_geometry_fills_terminal() {
 #[test]
 fn layout_b_geometry_pane_sizes_cover_terminal() {
     let geom = compute_geometry(&Layout::B, 100, 40);
-    // largura total dos dois painéis esquerda+direita ~= total
+    // largura total dos dois paineis esquerda+direita ~= total
     let left_width = geom[0].width;
     let right_width = geom[1].width;
     // +1 para a borda
@@ -36,20 +36,31 @@ fn layout_a_geometry_left_pane_spans_full_height() {
 
 #[test]
 fn free_pane_uses_shell_command_in_pty_mode() {
-    let pane = Layout::B.panes().remove(0);
-    let command = command_for_pane(&pane);
+    let agents = Layout::B.default_agents();
+    let config = &agents[0];
+    let command = command_for_pane(config);
 
     assert!(command.program.ends_with("sh"));
     assert!(command.args.is_empty());
 }
 
 #[test]
-fn agent_pane_also_uses_shell_command_in_pty_mode() {
-    let pane = Layout::B.panes().remove(1);
-    let command = command_for_pane(&pane);
+fn agent_pane_runs_its_command_in_pty_mode() {
+    let agents = Layout::B.default_agents();
+    let config = &agents[1]; // Claude
+    let command = command_for_pane(config);
+
+    assert_eq!(command.program, "claude");
+    assert_eq!(command.args, vec!["--dangerously-skip-permissions"]);
+}
+
+#[test]
+fn custom_string_command_runs_via_shell_in_pty_mode() {
+    let config = AgentConfig::new(AgentType::Custom("npm run dev".to_string()));
+    let command = command_for_pane(&config);
 
     assert!(command.program.ends_with("sh"));
-    assert!(command.args.is_empty());
+    assert_eq!(command.args, vec!["-lc", "npm run dev"]);
 }
 
 #[test]
@@ -114,7 +125,7 @@ fn render_lines_can_show_pane_title() {
         height: 3,
     };
 
-    let lines = render_lines(&geom, "shell | run codex --yolo", b"", false);
+    let lines = render_lines(&geom, "Codex", b"", false);
 
-    assert!(lines[0].contains("shell | run codex --yolo"));
+    assert!(lines[0].contains("Codex"));
 }
