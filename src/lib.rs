@@ -46,6 +46,17 @@ pub fn run(args: Args) {
         } else {
             return;
         }
+    } else if cfg!(target_os = "macos") {
+        if let Err(e) = crate::iterm::ensure_installed() {
+            eprintln!("Erro ao instalar iTerm2 automaticamente: {}", e);
+        } else if let Err(e) = crate::iterm::run(&args.layout) {
+            eprintln!(
+                "iTerm2 foi instalado, mas falhou ao abrir splits: {}. Tentando tmux/PTY...",
+                e
+            );
+        } else {
+            return;
+        }
     }
 
     match which::which("tmux") {

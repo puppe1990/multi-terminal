@@ -1,4 +1,6 @@
-use multi_terminal::iterm::{app_exists_in_paths, build_applescript, build_tab_specs};
+use multi_terminal::iterm::{
+    app_exists_in_paths, build_applescript, build_brew_install_command, build_tab_specs,
+};
 use multi_terminal::layout::Layout;
 
 #[test]
@@ -65,4 +67,12 @@ fn layout_a_applescript_uses_mixed_split_directions() {
 fn iterm_path_detection_checks_candidate_paths() {
     let missing = ["/definitely/missing/iTerm.app"];
     assert!(!app_exists_in_paths(&missing));
+}
+
+#[test]
+fn brew_install_command_targets_iterm2_cask() {
+    let command = build_brew_install_command("/opt/homebrew/bin/brew");
+
+    assert_eq!(command.program, "/opt/homebrew/bin/brew");
+    assert_eq!(command.args, vec!["install", "--cask", "iterm2"]);
 }

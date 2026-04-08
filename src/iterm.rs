@@ -7,6 +7,12 @@ pub struct TabSpec {
     pub command: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct ShellCommand {
+    pub program: String,
+    pub args: Vec<String>,
+}
+
 pub fn build_tab_specs(layout: &Layout) -> Vec<TabSpec> {
     layout
         .panes()
@@ -97,6 +103,48 @@ pub fn run(layout: &Layout) -> Result<(), String> {
 
 pub fn is_supported() -> bool {
     cfg!(target_os = "macos") && (iterm_app_exists() || app_exists_via_mdfind())
+}
+
+pub fn ensure_installed() -> Result<(), String> {
+    if !cfg!(target_os = "macos") || is_supported() {
+        return Ok(());
+    }
+
+    let brew = which::which("brew")
+        .map_err(|_| "iTerm2 nao encontrado e Homebrew nao esta instalado".to_string())?;
+
+    let install = build_brew_install_command(
+        brew.to_str()
+            .ok_or_else(|| "caminho do brew contem caracteres invalidos".to_string())?,
+    );
+
+    let status = std::process::Command::new(&install.program)
+        .args(&install.args)
+        .status()
+        .map_err(|e| format!("falha ao executar instalacao do iTerm2 via brew: {e}"))?;
+
+    if !status.success() {
+        return Err(format!(
+            "instalacao automatica do iTerm2 falhou com status {status}"
+        ));
+    }
+
+    if is_supported() {
+        Ok(())
+    } else {
+        Err("iTerm2 foi instalado, mas ainda nao ficou detectavel pelo sistema".to_string())
+    }
+}
+
+pub fn build_brew_install_command(brew_path: &str) -> ShellCommand {
+    ShellCommand {
+        program: brew_path.to_string(),
+        args: vec![
+            "install".to_string(),
+            "--cask".to_string(),
+            "iterm2".to_string(),
+        ],
+    }
 }
 
 fn iterm_app_exists() -> bool {
