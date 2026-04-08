@@ -1,4 +1,4 @@
-use crate::layout::Layout;
+use crate::layout::{Command as PaneCommand, Layout, PaneConfig};
 use crossterm::{
     cursor,
     event::{self, Event, KeyCode, KeyModifiers},
@@ -99,6 +99,18 @@ pub fn compute_geometry(layout: &Layout, cols: u16, rows: u16) -> Vec<PaneGeomet
     }
 }
 
+pub fn command_for_pane(config: &PaneConfig) -> PaneCommand {
+    config.command.clone().unwrap_or_else(default_shell_command)
+}
+
+fn default_shell_command() -> PaneCommand {
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "sh".to_string());
+    PaneCommand {
+        program: shell,
+        args: Vec::new(),
+    }
+}
+
 struct NullWriter;
 
 impl Write for NullWriter {
@@ -136,77 +148,75 @@ pub fn run(layout: &Layout) -> Result<(), String> {
     for (i, (geom, config)) in geometries.iter().zip(pane_configs.iter()).enumerate() {
         let output = Arc::new(Mutex::new(Vec::<u8>::new()));
 
-        if let Some(cmd) = &config.command {
-            let pty_size = PtySize {
-                rows: geom.height,
-                cols: geom.width,
-                pixel_width: 0,
-                pixel_height: 0,
-            };
+        let cmd = command_for_pane(config);
+        let pty_size = PtySize {
+            rows: geom.height,
+            cols: geom.width,
+            pixel_width: 0,
+            pixel_height: 0,
+        };
 
-            let pair = pty_system
-                .openpty(pty_size)
-                .map_err(|e| format!("falha ao abrir PTY para pane {}: {}", i, e))?;
+        let pair = pty_system
+            .openpty(pty_size)
+            .map_err(|e| format!("falha ao abrir PTY para pane {}: {}", i, e))?;
 
-            let mut builder = CommandBuilder::new(&cmd.program);
-            for arg in &cmd.args {
-                builder.arg(arg);
+        let mut builder = CommandBuilder::new(&cmd.program);
+        for arg in &cmd.args {
+            builder.arg(arg);
+        }
+
+        let child_result = pair.slave.spawn_command(builder);
+        if let Err(e) = child_result {
+            {
+                let mut lock = output.lock().unwrap();
+                lock.extend_from_slice(
+                    format!("Aviso: nao foi possivel iniciar '{}': {}\n", cmd.program, e)
+                        .as_bytes(),
+                );
             }
 
-            let child_result = pair.slave.spawn_command(builder);
-            if let Err(e) = child_result {
-                eprintln!("Aviso: não foi possível iniciar '{}': {}", cmd.program, e);
-                // Pane fica vazio com NullWriter
-                panes.push(Pane {
-                    geom: geom.clone(),
-                    output,
-                    writer: Box::new(NullWriter),
-                });
-                continue;
-            }
-
-            let mut reader = pair
-                .master
-                .try_clone_reader()
-                .map_err(|e| format!("falha ao clonar reader PTY: {}", e))?;
-
-            let output_clone = Arc::clone(&output);
-            thread::spawn(move || {
-                let mut buf = [0u8; 4096];
-                loop {
-                    match reader.read(&mut buf) {
-                        Ok(0) | Err(_) => break,
-                        Ok(n) => {
-                            let mut lock = output_clone.lock().unwrap();
-                            lock.extend_from_slice(&buf[..n]);
-                            // Mantém apenas os últimos 64KB
-                            if lock.len() > 65536 {
-                                let keep = lock.len() - 65536;
-                                lock.drain(..keep);
-                            }
-                        }
-                    }
-                }
-            });
-
-            let writer = pair
-                .master
-                .take_writer()
-                .map_err(|e| format!("falha ao obter writer PTY: {}", e))?;
-
-            panes.push(Pane {
-                geom: geom.clone(),
-                output,
-                writer,
-            });
-        } else {
-            // Pane livre: writer descarta tudo
             panes.push(Pane {
                 geom: geom.clone(),
                 output,
                 writer: Box::new(NullWriter),
             });
+            continue;
         }
+
+        let mut reader = pair
+            .master
+            .try_clone_reader()
+            .map_err(|e| format!("falha ao clonar reader PTY: {}", e))?;
+
+        let output_clone = Arc::clone(&output);
+        thread::spawn(move || {
+            let mut buf = [0u8; 4096];
+            loop {
+                match reader.read(&mut buf) {
+                    Ok(0) | Err(_) => break,
+                    Ok(n) => {
+                        let mut lock = output_clone.lock().unwrap();
+                        lock.extend_from_slice(&buf[..n]);
+                        // Mantém apenas os últimos 64KB
+                        if lock.len() > 65536 {
+                            let keep = lock.len() - 65536;
+                            lock.drain(..keep);
+                        }
+                    }
+                }
+            }
+        });
+
+        let writer = pair
+            .master
+            .take_writer()
+            .map_err(|e| format!("falha ao obter writer PTY: {}", e))?;
+
+        panes.push(Pane {
+            geom: geom.clone(),
+            output,
+            writer,
+        });
     }
 
     // Entra em modo raw e tela alternativa
@@ -216,15 +226,15 @@ pub fn run(layout: &Layout) -> Result<(), String> {
     let _guard = TerminalGuard;
 
     let mut focused: usize = 0;
-    let mut last_outputs: Vec<Vec<u8>> = vec![Vec::new(); panes.len()];
+    let mut last_outputs: Vec<Option<Vec<u8>>> = vec![None; panes.len()];
 
     loop {
         for (i, pane) in panes.iter().enumerate() {
             let output = pane.output.lock().unwrap().clone();
-            if output != last_outputs[i] {
+            if last_outputs[i].as_ref() != Some(&output) {
                 render_pane(&mut stdout, &pane.geom, &output, i == focused)
                     .map_err(|e| e.to_string())?;
-                last_outputs[i] = output;
+                last_outputs[i] = Some(output);
             }
         }
         stdout.flush().map_err(|e| e.to_string())?;
@@ -239,15 +249,19 @@ pub fn run(layout: &Layout) -> Result<(), String> {
                 Event::Key(k) if k.modifiers == KeyModifiers::CONTROL => match k.code {
                     KeyCode::Right => {
                         focused = (focused + 1) % panes.len();
+                        invalidate_all_panes(&mut last_outputs);
                     }
                     KeyCode::Left => {
                         focused = (focused + panes.len() - 1) % panes.len();
+                        invalidate_all_panes(&mut last_outputs);
                     }
                     KeyCode::Down => {
                         focused = (focused + 2) % panes.len();
+                        invalidate_all_panes(&mut last_outputs);
                     }
                     KeyCode::Up => {
                         focused = (focused + panes.len() - 2) % panes.len();
+                        invalidate_all_panes(&mut last_outputs);
                     }
                     _ => {}
                 },
@@ -269,31 +283,60 @@ fn render_pane(
     stdout: &mut impl Write,
     geom: &PaneGeometry,
     content: &[u8],
-    _focused: bool,
+    focused: bool,
 ) -> io::Result<()> {
-    let text = String::from_utf8_lossy(content);
-    let lines: Vec<&str> = text.lines().collect();
-    let start = lines.len().saturating_sub(geom.height as usize);
-
-    for (i, line) in lines[start..].iter().enumerate() {
-        let row = geom.row + i as u16;
-        if row >= geom.row + geom.height {
-            break;
-        }
-        let truncated = if line.len() > geom.width as usize {
-            &line[..geom.width as usize]
-        } else {
-            line
-        };
+    for (i, line) in render_lines(geom, content, focused).into_iter().enumerate() {
         execute!(
             stdout,
-            cursor::MoveTo(geom.col, row),
+            cursor::MoveTo(geom.col, geom.row + i as u16),
             Clear(ClearType::UntilNewLine),
-            Print(truncated)
+            Print(line)
         )?;
     }
 
     Ok(())
+}
+
+pub fn render_lines(geom: &PaneGeometry, content: &[u8], focused: bool) -> Vec<String> {
+    if geom.width == 0 || geom.height == 0 {
+        return Vec::new();
+    }
+
+    if geom.width < 2 || geom.height < 2 {
+        return vec![" ".repeat(geom.width as usize); geom.height as usize];
+    }
+
+    let inner_width = (geom.width - 2) as usize;
+    let inner_height = (geom.height - 2) as usize;
+    let horizontal = if focused { '=' } else { '-' };
+    let border = format!("+{}+", horizontal.to_string().repeat(inner_width));
+
+    let text = String::from_utf8_lossy(content);
+    let lines: Vec<&str> = text.lines().collect();
+    let start = lines.len().saturating_sub(inner_height);
+
+    let mut rendered = Vec::with_capacity(geom.height as usize);
+    rendered.push(border.clone());
+
+    for line in lines[start..].iter().take(inner_height) {
+        let mut visible = line.chars().take(inner_width).collect::<String>();
+        let padding = inner_width.saturating_sub(visible.chars().count());
+        visible.push_str(&" ".repeat(padding));
+        rendered.push(format!("|{}|", visible));
+    }
+
+    while rendered.len() < geom.height as usize - 1 {
+        rendered.push(format!("|{}|", " ".repeat(inner_width)));
+    }
+
+    rendered.push(border);
+    rendered
+}
+
+pub fn invalidate_all_panes(last_outputs: &mut [Option<Vec<u8>>]) {
+    for entry in last_outputs.iter_mut() {
+        *entry = None;
+    }
 }
 
 fn key_to_bytes(code: KeyCode) -> Vec<u8> {

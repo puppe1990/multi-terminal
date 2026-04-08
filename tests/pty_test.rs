@@ -1,5 +1,7 @@
 use multi_terminal::layout::Layout;
-use multi_terminal::pty::compute_geometry;
+use multi_terminal::pty::{
+    command_for_pane, compute_geometry, invalidate_all_panes, render_lines, PaneGeometry,
+};
 
 #[test]
 fn layout_b_geometry_fills_terminal() {
@@ -29,4 +31,40 @@ fn layout_a_geometry_left_pane_spans_full_height() {
     // pane 0 (esquerda) deve ter altura total
     assert_eq!(geom[0].row, 0);
     assert!(geom[0].height >= 38); // margem para bordas
+}
+
+#[test]
+fn free_pane_uses_shell_command_in_pty_mode() {
+    let pane = Layout::B.panes().remove(0);
+    let command = command_for_pane(&pane);
+
+    assert!(command.program.ends_with("sh"));
+    assert!(command.args.is_empty());
+}
+
+#[test]
+fn render_lines_draws_a_box_around_content() {
+    let geom = PaneGeometry {
+        row: 0,
+        col: 0,
+        width: 12,
+        height: 4,
+    };
+
+    let lines = render_lines(&geom, b"hello", false);
+
+    assert_eq!(lines.len(), 4);
+    assert_eq!(lines[0], "+----------+");
+    assert_eq!(lines[1], "|hello     |");
+    assert_eq!(lines[2], "|          |");
+    assert_eq!(lines[3], "+----------+");
+}
+
+#[test]
+fn invalidating_panes_marks_all_buffers_for_redraw() {
+    let mut buffers = vec![Some(vec![1, 2]), Some(vec![3]), None];
+
+    invalidate_all_panes(&mut buffers);
+
+    assert_eq!(buffers, vec![None, None, None]);
 }
