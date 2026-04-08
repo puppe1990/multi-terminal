@@ -26,6 +26,30 @@ pub fn parse_args(args: &[&str]) -> Args {
 }
 
 pub fn run(args: Args) {
-    // implementado nos tasks seguintes
-    let _ = args;
+    let (cols, rows) = crossterm::terminal::size().unwrap_or((80, 24));
+    if cols < 80 || rows < 24 {
+        eprintln!(
+            "Erro: terminal muito pequeno ({}x{}). Mínimo: 80x24.",
+            cols, rows
+        );
+        std::process::exit(1);
+    }
+
+    match which::which("tmux") {
+        Ok(_) => {
+            if let Err(e) = crate::tmux::run(&args.layout) {
+                eprintln!("Erro no modo tmux: {}. Tentando fallback PTY...", e);
+                if let Err(e2) = crate::pty::run(&args.layout) {
+                    eprintln!("Erro no fallback PTY: {}", e2);
+                    std::process::exit(1);
+                }
+            }
+        }
+        Err(_) => {
+            if let Err(e) = crate::pty::run(&args.layout) {
+                eprintln!("Erro no modo PTY: {}", e);
+                std::process::exit(1);
+            }
+        }
+    }
 }
