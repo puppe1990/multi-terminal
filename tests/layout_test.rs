@@ -158,7 +158,13 @@ fn resolve_agents_applies_cli_overrides_without_loaded_layout() {
 
 #[test]
 fn parse_args_supports_layout_type_and_panes() {
-    let args = parse_args(&["multi-terminal", "--layout-type", "grid", "--pane-count", "6"]);
+    let args = parse_args(&[
+        "multi-terminal",
+        "--layout-type",
+        "grid",
+        "--pane-count",
+        "6",
+    ]);
 
     assert_eq!(args.layout_type, Some(LayoutType::Grid));
     assert_eq!(args.pane_count, Some(6));
@@ -189,7 +195,7 @@ fn resolve_runtime_args_builds_dynamic_defaults() {
         resolved.agents[1].effective_command().unwrap().program,
         "claude"
     );
-    assert_eq!(resolved.agents[4].effective_command().is_none(), true);
+    assert!(resolved.agents[4].effective_command().is_none());
 }
 
 #[test]

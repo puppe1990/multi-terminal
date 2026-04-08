@@ -2,7 +2,11 @@ use crate::layout::{AgentConfig, LayoutMode};
 
 /// Builds the tmux shell command sequence for the given layout.
 /// session_name: name of the tmux session to create.
-pub fn build_commands(layout_mode: &LayoutMode, agents: &[AgentConfig], session_name: &str) -> Vec<String> {
+pub fn build_commands(
+    layout_mode: &LayoutMode,
+    agents: &[AgentConfig],
+    session_name: &str,
+) -> Vec<String> {
     let mut cmds = vec![
         // Create new detached session
         format!(
@@ -12,7 +16,7 @@ pub fn build_commands(layout_mode: &LayoutMode, agents: &[AgentConfig], session_
     ];
 
     let _pane_count = layout_mode.pane_count();
-    
+
     // Generate splits based on layout mode
     match layout_mode {
         LayoutMode::LegacyA => {
@@ -75,14 +79,11 @@ fn build_dynamic_splits(
             // Grid: split in a balanced way
             // For now, use a simple iterative approach
             let num_cols = (pane_count as f64).sqrt().ceil() as usize;
-            let num_rows = ((pane_count + num_cols - 1) / num_cols) as usize;
+            let num_rows = pane_count.div_ceil(num_cols);
 
             // First, create columns by splitting horizontally
             for _col in 1..num_cols {
-                cmds.push(format!(
-                    "tmux split-window -h -t {}:0.0",
-                    session_name
-                ));
+                cmds.push(format!("tmux split-window -h -t {}:0.0", session_name));
             }
 
             // Then split each column into rows vertically
@@ -100,32 +101,20 @@ fn build_dynamic_splits(
         }
         crate::layout::LayoutType::MainLeft => {
             // Main left: first split vertical, then split the right side
-            cmds.push(format!(
-                "tmux split-window -h -t {}:0.0",
-                session_name
-            ));
-            
+            cmds.push(format!("tmux split-window -h -t {}:0.0", session_name));
+
             // Split the right side into remaining panes
             for i in 1..pane_count - 1 {
-                cmds.push(format!(
-                    "tmux split-window -v -t {}:0.{}",
-                    session_name, i
-                ));
+                cmds.push(format!("tmux split-window -v -t {}:0.{}", session_name, i));
             }
         }
         crate::layout::LayoutType::MainTop => {
             // Main top: first split horizontal, then split the bottom side
-            cmds.push(format!(
-                "tmux split-window -v -t {}:0.0",
-                session_name
-            ));
-            
+            cmds.push(format!("tmux split-window -v -t {}:0.0", session_name));
+
             // Split the bottom side into remaining panes
             for i in 1..pane_count - 1 {
-                cmds.push(format!(
-                    "tmux split-window -h -t {}:0.{}",
-                    session_name, i
-                ));
+                cmds.push(format!("tmux split-window -h -t {}:0.{}", session_name, i));
             }
         }
     }

@@ -135,7 +135,7 @@ fn compute_geometry_dynamic(
 fn compute_grid(pane_count: usize, cols: u16, rows: u16) -> Vec<PaneGeometry> {
     // Balanced grid: calculate optimal rows and columns
     let num_cols = (pane_count as f64).sqrt().ceil() as u16;
-    let num_rows = ((pane_count as u16 + num_cols - 1) / num_cols) as u16;
+    let num_rows = (pane_count as u16).div_ceil(num_cols);
 
     let cell_width = (cols - (num_cols - 1)) / num_cols;
     let cell_height = (rows - (num_rows - 1)) / num_rows;
