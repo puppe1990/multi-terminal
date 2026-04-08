@@ -28,6 +28,7 @@ pub enum AgentType {
     Claude,
     Codex,
     Qwen,
+    OpenCode,
     Shell,
     Custom(String),
 }
@@ -38,6 +39,7 @@ impl AgentType {
             AgentType::Claude => Some(Command::new("claude", &["--dangerously-skip-permissions"])),
             AgentType::Codex => Some(Command::new("codex", &["--yolo"])),
             AgentType::Qwen => Some(Command::new("qwen", &["--yolo"])),
+            AgentType::OpenCode => Some(Command::new("opencode", &["--yolo"])),
             AgentType::Shell => None,
             AgentType::Custom(cmd) => Some(Command::new(cmd, &[])),
         }
@@ -48,6 +50,7 @@ impl AgentType {
             AgentType::Claude => "claude",
             AgentType::Codex => "codex",
             AgentType::Qwen => "qwen",
+            AgentType::OpenCode => "opencode",
             AgentType::Shell => "shell",
             AgentType::Custom(cmd) => cmd,
         }
@@ -96,6 +99,7 @@ impl AgentConfig {
                 AgentType::Claude => "Claude AI".to_string(),
                 AgentType::Codex => "Codex".to_string(),
                 AgentType::Qwen => "Qwen".to_string(),
+                AgentType::OpenCode => "OpenCode".to_string(),
                 AgentType::Shell => "Shell".to_string(),
                 AgentType::Custom(cmd) => cmd.clone(),
             })
@@ -106,6 +110,50 @@ impl AgentConfig {
 pub enum Layout {
     A,
     B,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum LayoutType {
+    Grid,
+    MainLeft,
+    MainTop,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LayoutMode {
+    LegacyA,
+    LegacyB,
+    Dynamic {
+        layout_type: LayoutType,
+        pane_count: usize,
+    },
+}
+
+impl LayoutMode {
+    pub fn pane_count(&self) -> usize {
+        match self {
+            LayoutMode::LegacyA | LayoutMode::LegacyB => 4,
+            LayoutMode::Dynamic { pane_count, .. } => *pane_count,
+        }
+    }
+
+    pub fn default_agents(&self) -> Vec<AgentConfig> {
+        let count = self.pane_count();
+        let mut agents = vec![AgentConfig::new(AgentType::Shell); count];
+        
+        // Assign default agents based on position
+        if count > 1 {
+            agents[1] = AgentConfig::new(AgentType::Claude);
+        }
+        if count > 2 {
+            agents[2] = AgentConfig::new(AgentType::Codex);
+        }
+        if count > 3 {
+            agents[3] = AgentConfig::new(AgentType::Qwen);
+        }
+        
+        agents
+    }
 }
 
 impl Layout {
@@ -205,13 +253,9 @@ impl SavedLayout {
     }
 
     pub fn validate(&self) -> Result<(), String> {
-        let layout = match self.layout.to_lowercase().as_str() {
-            "a" => Layout::A,
-            "b" => Layout::B,
-            other => return Err(format!("invalid saved layout '{}'", other)),
-        };
-
-        let expected = layout.expected_pane_count();
+        let layout_mode = self.to_layout_mode()?;
+        
+        let expected = layout_mode.pane_count();
         if self.agents.len() != expected {
             return Err(format!(
                 "invalid saved layout: expected {} panes, got {}",
@@ -221,5 +265,17 @@ impl SavedLayout {
         }
 
         Ok(())
+    }
+    
+    pub fn to_layout_mode(&self) -> Result<LayoutMode, String> {
+        // Try to parse as legacy first
+        match self.layout.to_lowercase().as_str() {
+            "a" => Ok(LayoutMode::LegacyA),
+            "b" => Ok(LayoutMode::LegacyB),
+            _ => {
+                // This will be updated in Task 3 when we add dynamic persistence
+                Err(format!("invalid saved layout '{}'", self.layout))
+            }
+        }
     }
 }

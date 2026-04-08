@@ -1,4 +1,4 @@
-use crate::layout::{AgentConfig, Command as PaneCommand, Layout};
+use crate::layout::{AgentConfig, Command as PaneCommand, LayoutMode};
 use crossterm::{
     cursor,
     event::{self, Event, KeyCode, KeyModifiers},
@@ -19,11 +19,18 @@ pub struct PaneGeometry {
     pub height: u16,
 }
 
-/// Calculates geometry for 4 panes given terminal size (cols x rows).
-/// Returns 4 geometries in pane order.
-pub fn compute_geometry(layout: &Layout, cols: u16, rows: u16) -> Vec<PaneGeometry> {
+/// Calculates geometry for panes given terminal size (cols x rows) and layout mode.
+/// Returns geometries in pane order.
+pub fn compute_geometry(layout_mode: &LayoutMode, cols: u16, rows: u16) -> Vec<PaneGeometry> {
+    // Convert LayoutMode to Layout for now
+    let layout = match layout_mode {
+        LayoutMode::LegacyA => crate::layout::Layout::A,
+        LayoutMode::LegacyB => crate::layout::Layout::B,
+        LayoutMode::Dynamic { .. } => crate::layout::Layout::B, // Default to B for now
+    };
+    
     match layout {
-        Layout::B => {
+        crate::layout::Layout::B => {
             let half_col = cols / 2;
             let half_row = rows / 2;
             let right_col = half_col + 1;
@@ -58,7 +65,7 @@ pub fn compute_geometry(layout: &Layout, cols: u16, rows: u16) -> Vec<PaneGeomet
                 },
             ]
         }
-        Layout::A => {
+        crate::layout::Layout::A => {
             let left_width = cols / 3;
             let right_col = left_width + 1;
             let right_width = cols.saturating_sub(right_col);
@@ -153,9 +160,16 @@ struct Pane {
     writer: Box<dyn Write + Send>,
 }
 
-pub fn run(layout: &Layout, agents: &[AgentConfig]) -> Result<(), String> {
+pub fn run(layout_mode: &LayoutMode, agents: &[AgentConfig]) -> Result<(), String> {
     let (cols, rows) = terminal::size().map_err(|e| e.to_string())?;
-    let geometries = compute_geometry(layout, cols, rows);
+    let geometries = compute_geometry(layout_mode, cols, rows);
+    
+    // Convert LayoutMode to Layout for panes
+    let layout = match layout_mode {
+        LayoutMode::LegacyA => crate::layout::Layout::A,
+        LayoutMode::LegacyB => crate::layout::Layout::B,
+        LayoutMode::Dynamic { .. } => crate::layout::Layout::B,
+    };
     let pane_configs = layout.panes(agents);
 
     let pty_system = native_pty_system();

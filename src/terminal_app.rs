@@ -1,13 +1,20 @@
-use crate::layout::{AgentConfig, Layout};
+use crate::layout::{AgentConfig, LayoutMode};
 
 pub fn build_applescript(
-    layout: &Layout,
+    layout_mode: &LayoutMode,
     agents: &[AgentConfig],
     cwd: &str,
 ) -> Result<String, String> {
     if cwd.is_empty() {
         return Err("current directory empty".to_string());
     }
+
+    // Convert LayoutMode to Layout for now
+    let layout = match layout_mode {
+        LayoutMode::LegacyA => crate::layout::Layout::A,
+        LayoutMode::LegacyB => crate::layout::Layout::B,
+        LayoutMode::Dynamic { .. } => crate::layout::Layout::B,
+    };
 
     let panes: Vec<_> = layout
         .panes(agents)
@@ -45,14 +52,14 @@ pub fn build_applescript(
     Ok(lines.join("\n"))
 }
 
-pub fn run(layout: &Layout, agents: &[AgentConfig]) -> Result<(), String> {
+pub fn run(layout_mode: &LayoutMode, agents: &[AgentConfig]) -> Result<(), String> {
     let cwd =
         std::env::current_dir().map_err(|e| format!("failed to get current directory: {e}"))?;
     let cwd = cwd
         .to_str()
         .ok_or_else(|| "current directory contains invalid characters".to_string())?;
 
-    let script = build_applescript(layout, agents, cwd)?;
+    let script = build_applescript(layout_mode, agents, cwd)?;
 
     let status = std::process::Command::new("osascript")
         .arg("-e")

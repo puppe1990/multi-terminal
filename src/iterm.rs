@@ -1,4 +1,4 @@
-use crate::layout::{AgentConfig, Layout};
+use crate::layout::{AgentConfig, LayoutMode};
 use std::path::Path;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -13,7 +13,14 @@ pub struct ShellCommand {
     pub args: Vec<String>,
 }
 
-pub fn build_tab_specs(layout: &Layout, agents: &[AgentConfig]) -> Vec<TabSpec> {
+pub fn build_tab_specs(layout_mode: &LayoutMode, agents: &[AgentConfig]) -> Vec<TabSpec> {
+    // Convert LayoutMode to Layout for now (will be updated in later tasks)
+    let layout = match layout_mode {
+        LayoutMode::LegacyA => crate::layout::Layout::A,
+        LayoutMode::LegacyB => crate::layout::Layout::B,
+        LayoutMode::Dynamic { .. } => crate::layout::Layout::B, // Default to B for now
+    };
+    
     layout
         .panes(agents)
         .into_iter()
@@ -29,7 +36,7 @@ pub fn build_tab_specs(layout: &Layout, agents: &[AgentConfig]) -> Vec<TabSpec> 
 }
 
 pub fn build_applescript(
-    layout: &Layout,
+    layout_mode: &LayoutMode,
     agents: &[AgentConfig],
     maximize: bool,
     cwd: &str,
@@ -38,11 +45,15 @@ pub fn build_applescript(
         return Err("current directory empty".to_string());
     }
 
-    let panes = build_tab_specs(layout, agents);
+    // Convert LayoutMode to Layout for now
+    let layout = match layout_mode {
+        LayoutMode::LegacyA => crate::layout::Layout::A,
+        LayoutMode::LegacyB => crate::layout::Layout::B,
+        LayoutMode::Dynamic { .. } => crate::layout::Layout::B, // Default to B for now
+    };
+
+    let panes = build_tab_specs(layout_mode, agents);
     let mut lines = vec![
-        r#"tell application "Finder""#.to_string(),
-        "  set screenBounds to bounds of window of desktop".to_string(),
-        "end tell".to_string(),
         r#"tell application "iTerm""#.to_string(),
         "  activate".to_string(),
         "  create window with default profile".to_string(),
@@ -50,13 +61,13 @@ pub fn build_applescript(
     ];
 
     if maximize {
-        lines.push("    set bounds to screenBounds".to_string());
+        lines.push("    set zoomed to true".to_string());
     }
 
     lines.push("    set pane0 to current session".to_string());
 
     match layout {
-        Layout::B => {
+        crate::layout::Layout::B => {
             lines.push("    tell pane0".to_string());
             lines.push("      set pane1 to (split horizontally with default profile)".to_string());
             lines.push("    end tell".to_string());
@@ -67,7 +78,7 @@ pub fn build_applescript(
             lines.push("      set pane3 to (split vertically with default profile)".to_string());
             lines.push("    end tell".to_string());
         }
-        Layout::A => {
+        crate::layout::Layout::A => {
             lines.push("    tell pane0".to_string());
             lines.push("      set pane1 to (split horizontally with default profile)".to_string());
             lines.push("    end tell".to_string());
@@ -107,14 +118,14 @@ pub fn build_applescript(
     Ok(lines.join("\n"))
 }
 
-pub fn run(layout: &Layout, agents: &[AgentConfig], maximize: bool) -> Result<(), String> {
+pub fn run(layout_mode: &LayoutMode, agents: &[AgentConfig], maximize: bool) -> Result<(), String> {
     let cwd =
         std::env::current_dir().map_err(|e| format!("failed to get current directory: {e}"))?;
     let cwd = cwd
         .to_str()
         .ok_or_else(|| "current directory contains invalid characters".to_string())?;
 
-    let script = build_applescript(layout, agents, maximize, cwd)?;
+    let script = build_applescript(layout_mode, agents, maximize, cwd)?;
 
     let status = std::process::Command::new("osascript")
         .arg("-e")

@@ -1,4 +1,4 @@
-use multi_terminal::layout::{AgentConfig, AgentType, Layout, SavedLayout};
+use multi_terminal::layout::{AgentConfig, AgentType, Layout, LayoutMode, LayoutType, SavedLayout};
 use multi_terminal::{parse_args, resolve_agents, resolve_runtime_args};
 
 fn default_agents() -> Vec<AgentConfig> {
@@ -87,7 +87,7 @@ fn resolve_runtime_args_uses_saved_layout_agents_when_loading() {
 
     let resolved = resolve_runtime_args(&args, Some(saved)).unwrap();
 
-    assert_eq!(resolved.layout, Layout::A);
+    assert_eq!(resolved.layout_mode, LayoutMode::LegacyA);
     assert!(resolved.maximize);
     assert_eq!(resolved.agents[0].effective_title(), "Monitor");
     assert_eq!(
@@ -154,4 +154,40 @@ fn resolve_agents_applies_cli_overrides_without_loaded_layout() {
         "npm run dev"
     );
     assert_eq!(agents[2].effective_title(), "App");
+}
+
+#[test]
+fn parse_args_supports_layout_type_and_panes() {
+    let args = parse_args(&["multi-terminal", "--layout-type", "grid", "--pane-count", "6"]);
+
+    assert_eq!(args.layout_type, Some(LayoutType::Grid));
+    assert_eq!(args.pane_count, Some(6));
+}
+
+#[test]
+fn resolve_runtime_args_builds_dynamic_defaults() {
+    let args = parse_args(&[
+        "multi-terminal",
+        "--layout-type",
+        "main-left",
+        "--pane-count",
+        "5",
+    ]);
+
+    let resolved = resolve_runtime_args(&args, None).unwrap();
+
+    assert_eq!(
+        resolved.layout_mode,
+        LayoutMode::Dynamic {
+            layout_type: LayoutType::MainLeft,
+            pane_count: 5,
+        }
+    );
+    assert_eq!(resolved.agents.len(), 5);
+    assert!(resolved.agents[0].effective_command().is_none());
+    assert_eq!(
+        resolved.agents[1].effective_command().unwrap().program,
+        "claude"
+    );
+    assert_eq!(resolved.agents[4].effective_command().is_none(), true);
 }

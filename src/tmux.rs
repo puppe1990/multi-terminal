@@ -1,8 +1,15 @@
-use crate::layout::{AgentConfig, Layout};
+use crate::layout::{AgentConfig, LayoutMode};
 
 /// Builds the tmux shell command sequence for the given layout.
 /// session_name: name of the tmux session to create.
-pub fn build_commands(layout: &Layout, agents: &[AgentConfig], session_name: &str) -> Vec<String> {
+pub fn build_commands(layout_mode: &LayoutMode, agents: &[AgentConfig], session_name: &str) -> Vec<String> {
+    // Convert LayoutMode to Layout for now
+    let layout = match layout_mode {
+        LayoutMode::LegacyA => crate::layout::Layout::A,
+        LayoutMode::LegacyB => crate::layout::Layout::B,
+        LayoutMode::Dynamic { .. } => crate::layout::Layout::B, // Default to B for now
+    };
+    
     let mut cmds = vec![
         // Create new detached session
         format!(
@@ -12,7 +19,7 @@ pub fn build_commands(layout: &Layout, agents: &[AgentConfig], session_name: &st
     ];
 
     match layout {
-        Layout::B => {
+        crate::layout::Layout::B => {
             // Layout B: 2x2 symmetric
             // Split left/right
             cmds.push(format!("tmux split-window -h -t {}:0.0", session_name));
@@ -21,7 +28,7 @@ pub fn build_commands(layout: &Layout, agents: &[AgentConfig], session_name: &st
             // Split right into top/bottom
             cmds.push(format!("tmux split-window -v -t {}:0.1", session_name));
         }
-        Layout::A => {
+        crate::layout::Layout::A => {
             // Layout A: left full height, right split top/bottom/bottom
             // Split left/right
             cmds.push(format!("tmux split-window -h -t {}:0.0", session_name));
@@ -53,7 +60,7 @@ pub fn build_commands(layout: &Layout, agents: &[AgentConfig], session_name: &st
 
 /// Executes the tmux command sequence for the given layout.
 /// Returns Err with message if any command fails (except kill-session).
-pub fn run(layout: &Layout, agents: &[AgentConfig]) -> Result<(), String> {
+pub fn run(layout_mode: &LayoutMode, agents: &[AgentConfig]) -> Result<(), String> {
     let session = "multi-terminal";
 
     // Kill session if exists (fire-and-forget)
@@ -65,7 +72,7 @@ pub fn run(layout: &Layout, agents: &[AgentConfig]) -> Result<(), String> {
         ))
         .status();
 
-    let commands = build_commands(layout, agents, session);
+    let commands = build_commands(layout_mode, agents, session);
 
     for cmd in &commands {
         let status = std::process::Command::new("sh")
