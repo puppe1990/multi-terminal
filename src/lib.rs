@@ -1,12 +1,15 @@
 pub mod layout;
-pub mod tmux;
 pub mod pty;
+pub mod tmux;
 
 use clap::Parser;
 use layout::Layout;
 
 #[derive(Parser, Debug)]
-#[command(name = "multi-terminal", about = "Abre 4 painéis de terminal com agentes de IA")]
+#[command(
+    name = "multi-terminal",
+    about = "Abre 4 painéis de terminal com agentes de IA"
+)]
 pub struct Args {
     /// Layout dos painéis: a ou b (padrão: b)
     #[arg(long, value_parser = parse_layout, default_value = "b")]

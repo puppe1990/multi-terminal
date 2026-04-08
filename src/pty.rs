@@ -32,10 +32,30 @@ pub fn compute_geometry(layout: &Layout, cols: u16, rows: u16) -> Vec<PaneGeomet
             let bottom_height = rows.saturating_sub(bottom_row);
 
             vec![
-                PaneGeometry { row: 0, col: 0, width: half_col, height: half_row },
-                PaneGeometry { row: 0, col: right_col, width: right_width, height: half_row },
-                PaneGeometry { row: bottom_row, col: 0, width: half_col, height: bottom_height },
-                PaneGeometry { row: bottom_row, col: right_col, width: right_width, height: bottom_height },
+                PaneGeometry {
+                    row: 0,
+                    col: 0,
+                    width: half_col,
+                    height: half_row,
+                },
+                PaneGeometry {
+                    row: 0,
+                    col: right_col,
+                    width: right_width,
+                    height: half_row,
+                },
+                PaneGeometry {
+                    row: bottom_row,
+                    col: 0,
+                    width: half_col,
+                    height: bottom_height,
+                },
+                PaneGeometry {
+                    row: bottom_row,
+                    col: right_col,
+                    width: right_width,
+                    height: bottom_height,
+                },
             ]
         }
         Layout::A => {
@@ -50,10 +70,30 @@ pub fn compute_geometry(layout: &Layout, cols: u16, rows: u16) -> Vec<PaneGeomet
             let qwen_width = right_width.saturating_sub(right_half + 1);
 
             vec![
-                PaneGeometry { row: 0, col: 0, width: left_width, height: rows },
-                PaneGeometry { row: 0, col: right_col, width: right_width, height: half_row },
-                PaneGeometry { row: bottom_row, col: right_col, width: right_half, height: bottom_height },
-                PaneGeometry { row: bottom_row, col: qwen_col, width: qwen_width, height: bottom_height },
+                PaneGeometry {
+                    row: 0,
+                    col: 0,
+                    width: left_width,
+                    height: rows,
+                },
+                PaneGeometry {
+                    row: 0,
+                    col: right_col,
+                    width: right_width,
+                    height: half_row,
+                },
+                PaneGeometry {
+                    row: bottom_row,
+                    col: right_col,
+                    width: right_half,
+                    height: bottom_height,
+                },
+                PaneGeometry {
+                    row: bottom_row,
+                    col: qwen_col,
+                    width: qwen_width,
+                    height: bottom_height,
+                },
             ]
         }
     }
@@ -117,7 +157,11 @@ pub fn run(layout: &Layout) -> Result<(), String> {
             if let Err(e) = child_result {
                 eprintln!("Aviso: não foi possível iniciar '{}': {}", cmd.program, e);
                 // Pane fica vazio com NullWriter
-                panes.push(Pane { geom: geom.clone(), output, writer: Box::new(NullWriter) });
+                panes.push(Pane {
+                    geom: geom.clone(),
+                    output,
+                    writer: Box::new(NullWriter),
+                });
                 continue;
             }
 
@@ -150,10 +194,18 @@ pub fn run(layout: &Layout) -> Result<(), String> {
                 .take_writer()
                 .map_err(|e| format!("falha ao obter writer PTY: {}", e))?;
 
-            panes.push(Pane { geom: geom.clone(), output, writer });
+            panes.push(Pane {
+                geom: geom.clone(),
+                output,
+                writer,
+            });
         } else {
             // Pane livre: writer descarta tudo
-            panes.push(Pane { geom: geom.clone(), output, writer: Box::new(NullWriter) });
+            panes.push(Pane {
+                geom: geom.clone(),
+                output,
+                writer: Box::new(NullWriter),
+            });
         }
     }
 
@@ -179,18 +231,26 @@ pub fn run(layout: &Layout) -> Result<(), String> {
 
         if event::poll(std::time::Duration::from_millis(16)).map_err(|e| e.to_string())? {
             match event::read().map_err(|e| e.to_string())? {
-                Event::Key(k) if k.code == KeyCode::Char('q') && k.modifiers == KeyModifiers::CONTROL => {
+                Event::Key(k)
+                    if k.code == KeyCode::Char('q') && k.modifiers == KeyModifiers::CONTROL =>
+                {
                     break;
                 }
-                Event::Key(k) if k.modifiers == KeyModifiers::CONTROL => {
-                    match k.code {
-                        KeyCode::Right => { focused = (focused + 1) % panes.len(); }
-                        KeyCode::Left => { focused = (focused + panes.len() - 1) % panes.len(); }
-                        KeyCode::Down => { focused = (focused + 2) % panes.len(); }
-                        KeyCode::Up => { focused = (focused + panes.len() - 2) % panes.len(); }
-                        _ => {}
+                Event::Key(k) if k.modifiers == KeyModifiers::CONTROL => match k.code {
+                    KeyCode::Right => {
+                        focused = (focused + 1) % panes.len();
                     }
-                }
+                    KeyCode::Left => {
+                        focused = (focused + panes.len() - 1) % panes.len();
+                    }
+                    KeyCode::Down => {
+                        focused = (focused + 2) % panes.len();
+                    }
+                    KeyCode::Up => {
+                        focused = (focused + panes.len() - 2) % panes.len();
+                    }
+                    _ => {}
+                },
                 Event::Key(k) => {
                     let bytes = key_to_bytes(k.code);
                     if !bytes.is_empty() {

@@ -74,7 +74,10 @@ pub fn run(layout: &Layout) -> Result<(), String> {
     // Kill session se existir (fire-and-forget)
     let _ = std::process::Command::new("sh")
         .arg("-c")
-        .arg(format!("tmux kill-session -t {} 2>/dev/null; true", session))
+        .arg(format!(
+            "tmux kill-session -t {} 2>/dev/null; true",
+            session
+        ))
         .status();
 
     let commands = build_commands(layout, session);

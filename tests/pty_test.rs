@@ -1,5 +1,5 @@
-use multi_terminal::pty::compute_geometry;
 use multi_terminal::layout::Layout;
+use multi_terminal::pty::compute_geometry;
 
 #[test]
 fn layout_b_geometry_fills_terminal() {

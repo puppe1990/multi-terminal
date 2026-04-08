@@ -10,7 +10,9 @@ fn layout_b_commands_start_with_new_session() {
 #[test]
 fn layout_b_sends_claude_command() {
     let cmds = build_commands(&Layout::B, "multi");
-    let has_claude = cmds.iter().any(|c| c.contains("claude --dangerously-skip-permissions"));
+    let has_claude = cmds
+        .iter()
+        .any(|c| c.contains("claude --dangerously-skip-permissions"));
     assert!(has_claude, "esperado comando claude nos cmds: {:?}", cmds);
 }
 
@@ -43,6 +45,8 @@ fn layout_a_commands_start_with_new_session() {
 #[test]
 fn layout_a_sends_claude_command() {
     let cmds = build_commands(&Layout::A, "multi");
-    let has_claude = cmds.iter().any(|c| c.contains("claude --dangerously-skip-permissions"));
+    let has_claude = cmds
+        .iter()
+        .any(|c| c.contains("claude --dangerously-skip-permissions"));
     assert!(has_claude);
 }

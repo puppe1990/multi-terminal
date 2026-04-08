@@ -1,5 +1,5 @@
-use multi_terminal::tmux::build_commands;
 use multi_terminal::layout::Layout;
+use multi_terminal::tmux::build_commands;
 
 #[test]
 fn all_four_panes_are_configured_in_layout_b() {
