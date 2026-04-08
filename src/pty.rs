@@ -22,88 +22,205 @@ pub struct PaneGeometry {
 /// Calculates geometry for panes given terminal size (cols x rows) and layout mode.
 /// Returns geometries in pane order.
 pub fn compute_geometry(layout_mode: &LayoutMode, cols: u16, rows: u16) -> Vec<PaneGeometry> {
-    // Convert LayoutMode to Layout for now
-    let layout = match layout_mode {
-        LayoutMode::LegacyA => crate::layout::Layout::A,
-        LayoutMode::LegacyB => crate::layout::Layout::B,
-        LayoutMode::Dynamic { .. } => crate::layout::Layout::B, // Default to B for now
-    };
-    
-    match layout {
-        crate::layout::Layout::B => {
-            let half_col = cols / 2;
-            let half_row = rows / 2;
-            let right_col = half_col + 1;
-            let right_width = cols.saturating_sub(right_col);
-            let bottom_row = half_row + 1;
-            let bottom_height = rows.saturating_sub(bottom_row);
+    match layout_mode {
+        LayoutMode::LegacyA => compute_geometry_legacy_a(cols, rows),
+        LayoutMode::LegacyB => compute_geometry_legacy_b(cols, rows),
+        LayoutMode::Dynamic {
+            layout_type,
+            pane_count,
+        } => compute_geometry_dynamic(layout_type, *pane_count, cols, rows),
+    }
+}
 
-            vec![
-                PaneGeometry {
-                    row: 0,
-                    col: 0,
-                    width: half_col,
-                    height: half_row,
-                },
-                PaneGeometry {
-                    row: 0,
-                    col: right_col,
-                    width: right_width,
-                    height: half_row,
-                },
-                PaneGeometry {
-                    row: bottom_row,
-                    col: 0,
-                    width: half_col,
-                    height: bottom_height,
-                },
-                PaneGeometry {
-                    row: bottom_row,
-                    col: right_col,
-                    width: right_width,
-                    height: bottom_height,
-                },
-            ]
-        }
-        crate::layout::Layout::A => {
-            let left_width = cols / 3;
-            let right_col = left_width + 1;
-            let right_width = cols.saturating_sub(right_col);
-            let half_row = rows / 2;
-            let bottom_row = half_row + 1;
-            let bottom_height = rows.saturating_sub(bottom_row);
-            let right_half = right_width / 2;
-            let qwen_col = right_col + right_half + 1;
-            let qwen_width = right_width.saturating_sub(right_half + 1);
+fn compute_geometry_legacy_b(cols: u16, rows: u16) -> Vec<PaneGeometry> {
+    let half_col = cols / 2;
+    let half_row = rows / 2;
+    let right_col = half_col + 1;
+    let right_width = cols.saturating_sub(right_col);
+    let bottom_row = half_row + 1;
+    let bottom_height = rows.saturating_sub(bottom_row);
 
-            vec![
-                PaneGeometry {
-                    row: 0,
-                    col: 0,
-                    width: left_width,
-                    height: rows,
-                },
-                PaneGeometry {
-                    row: 0,
-                    col: right_col,
-                    width: right_width,
-                    height: half_row,
-                },
-                PaneGeometry {
-                    row: bottom_row,
-                    col: right_col,
-                    width: right_half,
-                    height: bottom_height,
-                },
-                PaneGeometry {
-                    row: bottom_row,
-                    col: qwen_col,
-                    width: qwen_width,
-                    height: bottom_height,
-                },
-            ]
+    vec![
+        PaneGeometry {
+            row: 0,
+            col: 0,
+            width: half_col,
+            height: half_row,
+        },
+        PaneGeometry {
+            row: 0,
+            col: right_col,
+            width: right_width,
+            height: half_row,
+        },
+        PaneGeometry {
+            row: bottom_row,
+            col: 0,
+            width: half_col,
+            height: bottom_height,
+        },
+        PaneGeometry {
+            row: bottom_row,
+            col: right_col,
+            width: right_width,
+            height: bottom_height,
+        },
+    ]
+}
+
+fn compute_geometry_legacy_a(cols: u16, rows: u16) -> Vec<PaneGeometry> {
+    let left_width = cols / 3;
+    let right_col = left_width + 1;
+    let right_width = cols.saturating_sub(right_col);
+    let half_row = rows / 2;
+    let bottom_row = half_row + 1;
+    let bottom_height = rows.saturating_sub(bottom_row);
+    let right_half = right_width / 2;
+    let qwen_col = right_col + right_half + 1;
+    let qwen_width = right_width.saturating_sub(right_half + 1);
+
+    vec![
+        PaneGeometry {
+            row: 0,
+            col: 0,
+            width: left_width,
+            height: rows,
+        },
+        PaneGeometry {
+            row: 0,
+            col: right_col,
+            width: right_width,
+            height: half_row,
+        },
+        PaneGeometry {
+            row: bottom_row,
+            col: right_col,
+            width: right_half,
+            height: bottom_height,
+        },
+        PaneGeometry {
+            row: bottom_row,
+            col: qwen_col,
+            width: qwen_width,
+            height: bottom_height,
+        },
+    ]
+}
+
+fn compute_geometry_dynamic(
+    layout_type: &crate::layout::LayoutType,
+    pane_count: usize,
+    cols: u16,
+    rows: u16,
+) -> Vec<PaneGeometry> {
+    if pane_count == 0 {
+        return vec![];
+    }
+    if pane_count == 1 {
+        return vec![PaneGeometry {
+            row: 0,
+            col: 0,
+            width: cols,
+            height: rows,
+        }];
+    }
+
+    match layout_type {
+        crate::layout::LayoutType::Grid => compute_grid(pane_count, cols, rows),
+        crate::layout::LayoutType::MainLeft => compute_main_left(pane_count, cols, rows),
+        crate::layout::LayoutType::MainTop => compute_main_top(pane_count, cols, rows),
+    }
+}
+
+fn compute_grid(pane_count: usize, cols: u16, rows: u16) -> Vec<PaneGeometry> {
+    // Balanced grid: calculate optimal rows and columns
+    let num_cols = (pane_count as f64).sqrt().ceil() as u16;
+    let num_rows = ((pane_count as u16 + num_cols - 1) / num_cols) as u16;
+
+    let cell_width = (cols - (num_cols - 1)) / num_cols;
+    let cell_height = (rows - (num_rows - 1)) / num_rows;
+
+    let mut geometries = Vec::with_capacity(pane_count);
+    let mut count = 0;
+
+    for row in 0..num_rows {
+        for col in 0..num_cols {
+            if count >= pane_count {
+                break;
+            }
+
+            let r = row * (cell_height + 1);
+            let c = col * (cell_width + 1);
+
+            geometries.push(PaneGeometry {
+                row: r,
+                col: c,
+                width: cell_width,
+                height: cell_height,
+            });
+            count += 1;
         }
     }
+
+    geometries
+}
+
+fn compute_main_left(pane_count: usize, cols: u16, rows: u16) -> Vec<PaneGeometry> {
+    // First pane takes ~60% on the left, rest split vertically on the right
+    let main_width = (cols as f64 * 0.6) as u16;
+    let right_col = main_width + 1;
+    let right_width = cols.saturating_sub(right_col);
+
+    let remaining_panes = pane_count - 1;
+    let cell_height = (rows - (remaining_panes as u16 - 1)) / remaining_panes as u16;
+
+    let mut geometries = vec![PaneGeometry {
+        row: 0,
+        col: 0,
+        width: main_width,
+        height: rows,
+    }];
+
+    for i in 0..remaining_panes {
+        let r = (i as u16) * (cell_height + 1);
+        geometries.push(PaneGeometry {
+            row: r,
+            col: right_col,
+            width: right_width,
+            height: cell_height,
+        });
+    }
+
+    geometries
+}
+
+fn compute_main_top(pane_count: usize, cols: u16, rows: u16) -> Vec<PaneGeometry> {
+    // First pane takes ~40% on top, rest split horizontally below
+    let main_height = (rows as f64 * 0.4) as u16;
+    let bottom_row = main_height + 1;
+    let bottom_height = rows.saturating_sub(bottom_row);
+
+    let remaining_panes = pane_count - 1;
+    let cell_width = (cols - (remaining_panes as u16 - 1)) / remaining_panes as u16;
+
+    let mut geometries = vec![PaneGeometry {
+        row: 0,
+        col: 0,
+        width: cols,
+        height: main_height,
+    }];
+
+    for i in 0..remaining_panes {
+        let c = (i as u16) * (cell_width + 1);
+        geometries.push(PaneGeometry {
+            row: bottom_row,
+            col: c,
+            width: cell_width,
+            height: bottom_height,
+        });
+    }
+
+    geometries
 }
 
 pub fn command_for_pane(config: &AgentConfig) -> PaneCommand {
@@ -163,14 +280,7 @@ struct Pane {
 pub fn run(layout_mode: &LayoutMode, agents: &[AgentConfig]) -> Result<(), String> {
     let (cols, rows) = terminal::size().map_err(|e| e.to_string())?;
     let geometries = compute_geometry(layout_mode, cols, rows);
-    
-    // Convert LayoutMode to Layout for panes
-    let layout = match layout_mode {
-        LayoutMode::LegacyA => crate::layout::Layout::A,
-        LayoutMode::LegacyB => crate::layout::Layout::B,
-        LayoutMode::Dynamic { .. } => crate::layout::Layout::B,
-    };
-    let pane_configs = layout.panes(agents);
+    let pane_configs = agents.to_vec();
 
     let pty_system = native_pty_system();
     let mut panes: Vec<Pane> = Vec::new();

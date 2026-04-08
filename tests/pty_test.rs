@@ -1,4 +1,4 @@
-use multi_terminal::layout::{AgentConfig, AgentType, Layout};
+use multi_terminal::layout::{AgentConfig, AgentType, Layout, LayoutMode, LayoutType};
 use multi_terminal::pty::{
     command_for_pane, compute_geometry, invalidate_all_panes, normalize_terminal_output,
     render_lines, PaneGeometry,
@@ -6,7 +6,7 @@ use multi_terminal::pty::{
 
 #[test]
 fn layout_b_geometry_fills_terminal() {
-    let geom = compute_geometry(&Layout::B, 100, 40);
+    let geom = compute_geometry(&LayoutMode::LegacyB, 100, 40);
     assert_eq!(geom.len(), 4);
     // Pane 0 e 2 devem estar na coluna esquerda
     assert_eq!(geom[0].col, 0);
@@ -18,7 +18,7 @@ fn layout_b_geometry_fills_terminal() {
 
 #[test]
 fn layout_b_geometry_pane_sizes_cover_terminal() {
-    let geom = compute_geometry(&Layout::B, 100, 40);
+    let geom = compute_geometry(&LayoutMode::LegacyB, 100, 40);
     // largura total dos dois paineis esquerda+direita ~= total
     let left_width = geom[0].width;
     let right_width = geom[1].width;
@@ -28,7 +28,7 @@ fn layout_b_geometry_pane_sizes_cover_terminal() {
 
 #[test]
 fn layout_a_geometry_left_pane_spans_full_height() {
-    let geom = compute_geometry(&Layout::A, 100, 40);
+    let geom = compute_geometry(&LayoutMode::LegacyA, 100, 40);
     // pane 0 (esquerda) deve ter altura total
     assert_eq!(geom[0].row, 0);
     assert!(geom[0].height >= 38); // margem para bordas
@@ -128,4 +128,34 @@ fn render_lines_can_show_pane_title() {
     let lines = render_lines(&geom, "Codex", b"", false);
 
     assert!(lines[0].contains("Codex"));
+}
+
+#[test]
+fn compute_geometry_grid_supports_six_panes() {
+    let panes = compute_geometry(
+        &LayoutMode::Dynamic {
+            layout_type: LayoutType::Grid,
+            pane_count: 6,
+        },
+        120,
+        40,
+    );
+
+    assert_eq!(panes.len(), 6);
+    assert!(panes.iter().all(|pane| pane.width > 0 && pane.height > 0));
+}
+
+#[test]
+fn compute_geometry_main_left_supports_five_panes() {
+    let panes = compute_geometry(
+        &LayoutMode::Dynamic {
+            layout_type: LayoutType::MainLeft,
+            pane_count: 5,
+        },
+        120,
+        40,
+    );
+
+    assert_eq!(panes.len(), 5);
+    assert!(panes[0].width > panes[1].width);
 }
