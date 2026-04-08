@@ -191,9 +191,19 @@ impl Layout {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum SavedLayoutKind {
+    Legacy(String),
+    Dynamic {
+        layout_type: LayoutType,
+        pane_count: usize,
+    },
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SavedLayout {
-    pub layout: String,
+    pub layout: SavedLayoutKind,
     pub agents: Vec<AgentConfig>,
     pub maximize: bool,
 }
@@ -268,14 +278,21 @@ impl SavedLayout {
     }
     
     pub fn to_layout_mode(&self) -> Result<LayoutMode, String> {
-        // Try to parse as legacy first
-        match self.layout.to_lowercase().as_str() {
-            "a" => Ok(LayoutMode::LegacyA),
-            "b" => Ok(LayoutMode::LegacyB),
-            _ => {
-                // This will be updated in Task 3 when we add dynamic persistence
-                Err(format!("invalid saved layout '{}'", self.layout))
+        match &self.layout {
+            SavedLayoutKind::Legacy(s) => {
+                match s.to_lowercase().as_str() {
+                    "a" => Ok(LayoutMode::LegacyA),
+                    "b" => Ok(LayoutMode::LegacyB),
+                    other => Err(format!("invalid saved layout '{}'", other)),
+                }
             }
+            SavedLayoutKind::Dynamic {
+                layout_type,
+                pane_count,
+            } => Ok(LayoutMode::Dynamic {
+                layout_type: layout_type.clone(),
+                pane_count: *pane_count,
+            }),
         }
     }
 }

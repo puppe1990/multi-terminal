@@ -377,9 +377,23 @@ pub fn run(args: Args) {
             Ok(layouts) => {
                 println!("Saved layouts:");
                 for (name, layout) in layouts {
+                    let layout_desc = match layout.layout {
+                        layout::SavedLayoutKind::Legacy(ref s) => s.clone(),
+                        layout::SavedLayoutKind::Dynamic {
+                            ref layout_type,
+                            pane_count,
+                        } => {
+                            let type_str = match layout_type {
+                                LayoutType::Grid => "grid",
+                                LayoutType::MainLeft => "main-left",
+                                LayoutType::MainTop => "main-top",
+                            };
+                            format!("{} {} panes", type_str, pane_count)
+                        }
+                    };
                     println!(
                         "  {} (layout: {}, maximize: {})",
-                        name, layout.layout, layout.maximize
+                        name, layout_desc, layout.maximize
                     );
                 }
                 return;
@@ -422,18 +436,20 @@ pub fn run(args: Args) {
 
     // Handle --save
     if let Some(ref name) = args.save {
-        let layout_str = match runtime.layout_mode {
-            LayoutMode::LegacyA => "a".to_string(),
-            LayoutMode::LegacyB => "b".to_string(),
-            LayoutMode::Dynamic { .. } => {
-                // This will be updated in Task 3
-                eprintln!("Error: saving dynamic layouts not yet supported.");
-                std::process::exit(1);
-            }
+        let layout_kind = match runtime.layout_mode {
+            LayoutMode::LegacyA => layout::SavedLayoutKind::Legacy("a".to_string()),
+            LayoutMode::LegacyB => layout::SavedLayoutKind::Legacy("b".to_string()),
+            LayoutMode::Dynamic {
+                ref layout_type,
+                pane_count,
+            } => layout::SavedLayoutKind::Dynamic {
+                layout_type: layout_type.clone(),
+                pane_count,
+            },
         };
-        
+
         let saved = SavedLayout {
-            layout: layout_str,
+            layout: layout_kind,
             agents: runtime.agents.clone(),
             maximize: runtime.maximize,
         };

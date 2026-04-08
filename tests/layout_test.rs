@@ -75,7 +75,7 @@ fn flag_layout_b_selects_layout_b() {
 fn resolve_runtime_args_uses_saved_layout_agents_when_loading() {
     let args = parse_args(&["multi-terminal", "--load", "team"]);
     let saved = SavedLayout {
-        layout: "a".to_string(),
+        layout: multi_terminal::layout::SavedLayoutKind::Legacy("a".to_string()),
         agents: vec![
             AgentConfig::new(AgentType::Custom("htop".to_string())).with_title("Monitor"),
             AgentConfig::new(AgentType::Shell),
@@ -109,7 +109,7 @@ fn resolve_runtime_args_allows_cli_overrides_on_loaded_agents() {
         "--no-qwen",
     ]);
     let saved = SavedLayout {
-        layout: "b".to_string(),
+        layout: multi_terminal::layout::SavedLayoutKind::Legacy("b".to_string()),
         agents: Layout::B.default_agents(),
         maximize: false,
     };
@@ -128,7 +128,7 @@ fn resolve_runtime_args_allows_cli_overrides_on_loaded_agents() {
 fn resolve_runtime_args_rejects_loaded_layout_with_wrong_pane_count() {
     let args = parse_args(&["multi-terminal", "--load", "broken"]);
     let saved = SavedLayout {
-        layout: "b".to_string(),
+        layout: multi_terminal::layout::SavedLayoutKind::Legacy("b".to_string()),
         agents: vec![AgentConfig::new(AgentType::Shell)],
         maximize: false,
     };
@@ -230,4 +230,45 @@ fn resolve_runtime_args_rejects_override_out_of_bounds() {
     let error = resolve_runtime_args(&args, None).unwrap_err();
 
     assert!(error.contains("pane index 4 is out of bounds for 3 panes"));
+}
+
+#[test]
+fn resolve_runtime_args_uses_saved_dynamic_layout() {
+    let args = parse_args(&["multi-terminal", "--load", "team"]);
+    let saved = SavedLayout {
+        layout: multi_terminal::layout::SavedLayoutKind::Dynamic {
+            layout_type: LayoutType::MainTop,
+            pane_count: 5,
+        },
+        agents: vec![
+            AgentConfig::new(AgentType::Shell),
+            AgentConfig::new(AgentType::Claude),
+            AgentConfig::new(AgentType::Codex),
+            AgentConfig::new(AgentType::Qwen),
+            AgentConfig::new(AgentType::Custom("npm test".to_string())),
+        ],
+        maximize: true,
+    };
+
+    let resolved = resolve_runtime_args(&args, Some(saved)).unwrap();
+
+    assert_eq!(
+        resolved.layout_mode,
+        LayoutMode::Dynamic {
+            layout_type: LayoutType::MainTop,
+            pane_count: 5,
+        }
+    );
+    assert_eq!(resolved.agents.len(), 5);
+}
+
+#[test]
+fn saved_layout_validate_accepts_legacy_shape() {
+    let saved = SavedLayout {
+        layout: multi_terminal::layout::SavedLayoutKind::Legacy("b".to_string()),
+        agents: LayoutMode::LegacyB.default_agents(),
+        maximize: false,
+    };
+
+    assert!(saved.validate().is_ok());
 }
