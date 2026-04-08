@@ -100,7 +100,8 @@ pub fn compute_geometry(layout: &Layout, cols: u16, rows: u16) -> Vec<PaneGeomet
 }
 
 pub fn command_for_pane(config: &PaneConfig) -> PaneCommand {
-    config.command.clone().unwrap_or_else(default_shell_command)
+    let _ = config;
+    default_shell_command()
 }
 
 fn default_shell_command() -> PaneCommand {
@@ -133,6 +134,7 @@ impl Drop for TerminalGuard {
 
 struct Pane {
     geom: PaneGeometry,
+    title: String,
     output: Arc<Mutex<Vec<u8>>>,
     writer: Box<dyn Write + Send>,
 }
@@ -177,6 +179,7 @@ pub fn run(layout: &Layout) -> Result<(), String> {
 
             panes.push(Pane {
                 geom: geom.clone(),
+                title: pane_title(i, config),
                 output,
                 writer: Box::new(NullWriter),
             });
@@ -214,6 +217,7 @@ pub fn run(layout: &Layout) -> Result<(), String> {
 
         panes.push(Pane {
             geom: geom.clone(),
+            title: pane_title(i, config),
             output,
             writer,
         });
@@ -232,7 +236,7 @@ pub fn run(layout: &Layout) -> Result<(), String> {
         for (i, pane) in panes.iter().enumerate() {
             let output = pane.output.lock().unwrap().clone();
             if last_outputs[i].as_ref() != Some(&output) {
-                render_pane(&mut stdout, &pane.geom, &output, i == focused)
+                render_pane(&mut stdout, &pane.geom, &pane.title, &output, i == focused)
                     .map_err(|e| e.to_string())?;
                 last_outputs[i] = Some(output);
             }
@@ -282,10 +286,14 @@ pub fn run(layout: &Layout) -> Result<(), String> {
 fn render_pane(
     stdout: &mut impl Write,
     geom: &PaneGeometry,
+    title: &str,
     content: &[u8],
     focused: bool,
 ) -> io::Result<()> {
-    for (i, line) in render_lines(geom, content, focused).into_iter().enumerate() {
+    for (i, line) in render_lines(geom, title, content, focused)
+        .into_iter()
+        .enumerate()
+    {
         execute!(
             stdout,
             cursor::MoveTo(geom.col, geom.row + i as u16),
@@ -297,7 +305,12 @@ fn render_pane(
     Ok(())
 }
 
-pub fn render_lines(geom: &PaneGeometry, content: &[u8], focused: bool) -> Vec<String> {
+pub fn render_lines(
+    geom: &PaneGeometry,
+    title: &str,
+    content: &[u8],
+    focused: bool,
+) -> Vec<String> {
     if geom.width == 0 || geom.height == 0 {
         return Vec::new();
     }
@@ -309,7 +322,7 @@ pub fn render_lines(geom: &PaneGeometry, content: &[u8], focused: bool) -> Vec<S
     let inner_width = (geom.width - 2) as usize;
     let inner_height = (geom.height - 2) as usize;
     let horizontal = if focused { '=' } else { '-' };
-    let border = format!("+{}+", horizontal.to_string().repeat(inner_width));
+    let border = border_line(inner_width, title, horizontal);
 
     let text = normalize_terminal_output(content);
     let lines: Vec<&str> = text.lines().collect();
@@ -331,6 +344,39 @@ pub fn render_lines(geom: &PaneGeometry, content: &[u8], focused: bool) -> Vec<S
 
     rendered.push(border);
     rendered
+}
+
+fn border_line(inner_width: usize, title: &str, horizontal: char) -> String {
+    if inner_width == 0 {
+        return "++".to_string();
+    }
+
+    let clean_title = title.trim();
+    if clean_title.is_empty() || clean_title.len() + 2 >= inner_width {
+        return format!("+{}+", horizontal.to_string().repeat(inner_width));
+    }
+
+    let label = format!(" {} ", clean_title);
+    let left = (inner_width - label.len()) / 2;
+    let right = inner_width - label.len() - left;
+
+    format!(
+        "+{}{}{}+",
+        horizontal.to_string().repeat(left),
+        label,
+        horizontal.to_string().repeat(right)
+    )
+}
+
+fn pane_title(index: usize, config: &PaneConfig) -> String {
+    if index == 0 {
+        return "shell".to_string();
+    }
+
+    match &config.command {
+        Some(command) => format!("shell | run {}", command.to_shell_string()),
+        None => "shell".to_string(),
+    }
 }
 
 pub fn normalize_terminal_output(content: &[u8]) -> String {

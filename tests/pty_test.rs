@@ -44,6 +44,15 @@ fn free_pane_uses_shell_command_in_pty_mode() {
 }
 
 #[test]
+fn agent_pane_also_uses_shell_command_in_pty_mode() {
+    let pane = Layout::B.panes().remove(1);
+    let command = command_for_pane(&pane);
+
+    assert!(command.program.ends_with("sh"));
+    assert!(command.args.is_empty());
+}
+
+#[test]
 fn render_lines_draws_a_box_around_content() {
     let geom = PaneGeometry {
         row: 0,
@@ -52,7 +61,7 @@ fn render_lines_draws_a_box_around_content() {
         height: 4,
     };
 
-    let lines = render_lines(&geom, b"hello", false);
+    let lines = render_lines(&geom, "", b"hello", false);
 
     assert_eq!(lines.len(), 4);
     assert_eq!(lines[0], "+----------+");
@@ -88,10 +97,24 @@ fn render_lines_ignores_terminal_control_bytes() {
         height: 4,
     };
 
-    let lines = render_lines(&geom, b"\x1b[2J\x1b[Hhi\r\nthere", false);
+    let lines = render_lines(&geom, "", b"\x1b[2J\x1b[Hhi\r\nthere", false);
 
     assert_eq!(lines[0], "+------------+");
     assert_eq!(lines[1], "|hi          |");
     assert_eq!(lines[2], "|there       |");
     assert_eq!(lines[3], "+------------+");
+}
+
+#[test]
+fn render_lines_can_show_pane_title() {
+    let geom = PaneGeometry {
+        row: 0,
+        col: 0,
+        width: 30,
+        height: 3,
+    };
+
+    let lines = render_lines(&geom, "shell | run codex --yolo", b"", false);
+
+    assert!(lines[0].contains("shell | run codex --yolo"));
 }
