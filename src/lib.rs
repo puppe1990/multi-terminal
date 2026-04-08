@@ -1,3 +1,4 @@
+pub mod iterm;
 pub mod layout;
 pub mod pty;
 pub mod tmux;
@@ -36,6 +37,14 @@ pub fn run(args: Args) {
             cols, rows
         );
         std::process::exit(1);
+    }
+
+    if crate::iterm::is_supported() {
+        if let Err(e) = crate::iterm::run(&args.layout) {
+            eprintln!("Erro no modo iTerm2: {}. Tentando tmux/PTy...", e);
+        } else {
+            return;
+        }
     }
 
     match which::which("tmux") {
