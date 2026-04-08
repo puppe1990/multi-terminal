@@ -1,4 +1,5 @@
 use multi_terminal::layout::Layout;
+use multi_terminal::parse_args;
 
 #[test]
 fn layout_b_has_four_panes() {
@@ -46,4 +47,22 @@ fn layout_b_pane3_runs_qwen() {
 fn layout_a_pane0_is_free() {
     let panes = Layout::A.panes();
     assert!(panes[0].command.is_none());
+}
+
+#[test]
+fn default_layout_is_b() {
+    let args = parse_args(&["multi-terminal"]);
+    assert_eq!(args.layout, Layout::B);
+}
+
+#[test]
+fn flag_layout_a_selects_layout_a() {
+    let args = parse_args(&["multi-terminal", "--layout", "a"]);
+    assert_eq!(args.layout, Layout::A);
+}
+
+#[test]
+fn flag_layout_b_selects_layout_b() {
+    let args = parse_args(&["multi-terminal", "--layout", "b"]);
+    assert_eq!(args.layout, Layout::B);
 }
