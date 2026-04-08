@@ -53,7 +53,11 @@ pub fn build_applescript(
     };
 
     let panes = build_tab_specs(layout_mode, agents);
+    let pane_count = layout_mode.pane_count();
     let mut lines = vec![
+        r#"tell application "Finder""#.to_string(),
+        "  set screenBounds to bounds of window of desktop".to_string(),
+        "end tell".to_string(),
         r#"tell application "iTerm""#.to_string(),
         "  activate".to_string(),
         "  create window with default profile".to_string(),
@@ -61,33 +65,50 @@ pub fn build_applescript(
     ];
 
     if maximize {
-        lines.push("    set zoomed to true".to_string());
+        lines.push("    set bounds to screenBounds".to_string());
     }
 
-    lines.push("    set pane0 to current session".to_string());
+    // Single pane: no splits needed
+    if pane_count == 1 {
+        lines.push("    set pane0 to current session".to_string());
+    } else {
+        lines.push("    set pane0 to current session".to_string());
 
-    match layout {
-        crate::layout::Layout::B => {
-            lines.push("    tell pane0".to_string());
-            lines.push("      set pane1 to (split horizontally with default profile)".to_string());
-            lines.push("    end tell".to_string());
-            lines.push("    tell pane0".to_string());
-            lines.push("      set pane2 to (split vertically with default profile)".to_string());
-            lines.push("    end tell".to_string());
-            lines.push("    tell pane1".to_string());
-            lines.push("      set pane3 to (split vertically with default profile)".to_string());
-            lines.push("    end tell".to_string());
-        }
-        crate::layout::Layout::A => {
-            lines.push("    tell pane0".to_string());
-            lines.push("      set pane1 to (split horizontally with default profile)".to_string());
-            lines.push("    end tell".to_string());
-            lines.push("    tell pane1".to_string());
-            lines.push("      set pane2 to (split vertically with default profile)".to_string());
-            lines.push("    end tell".to_string());
-            lines.push("    tell pane2".to_string());
-            lines.push("      set pane3 to (split horizontally with default profile)".to_string());
-            lines.push("    end tell".to_string());
+        match layout {
+            crate::layout::Layout::B => {
+                lines.push("    tell pane0".to_string());
+                lines.push(
+                    "      set pane1 to (split horizontally with default profile)".to_string(),
+                );
+                lines.push("    end tell".to_string());
+                lines.push("    tell pane0".to_string());
+                lines.push(
+                    "      set pane2 to (split vertically with default profile)".to_string(),
+                );
+                lines.push("    end tell".to_string());
+                lines.push("    tell pane1".to_string());
+                lines.push(
+                    "      set pane3 to (split vertically with default profile)".to_string(),
+                );
+                lines.push("    end tell".to_string());
+            }
+            crate::layout::Layout::A => {
+                lines.push("    tell pane0".to_string());
+                lines.push(
+                    "      set pane1 to (split horizontally with default profile)".to_string(),
+                );
+                lines.push("    end tell".to_string());
+                lines.push("    tell pane1".to_string());
+                lines.push(
+                    "      set pane2 to (split vertically with default profile)".to_string(),
+                );
+                lines.push("    end tell".to_string());
+                lines.push("    tell pane2".to_string());
+                lines.push(
+                    "      set pane3 to (split horizontally with default profile)".to_string(),
+                );
+                lines.push("    end tell".to_string());
+            }
         }
     }
 

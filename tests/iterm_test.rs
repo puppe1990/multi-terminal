@@ -1,15 +1,15 @@
 use multi_terminal::iterm::{
     app_exists_in_paths, build_applescript, build_brew_install_command, build_tab_specs,
 };
-use multi_terminal::layout::{AgentConfig, Layout};
+use multi_terminal::layout::{AgentConfig, LayoutMode};
 
 fn default_agents() -> Vec<AgentConfig> {
-    Layout::B.default_agents()
+    LayoutMode::LegacyB.default_agents()
 }
 
 #[test]
 fn build_tab_specs_keeps_first_tab_as_shell() {
-    let tabs = build_tab_specs(&Layout::B, &default_agents());
+    let tabs = build_tab_specs(&LayoutMode::LegacyB, &default_agents());
 
     assert_eq!(tabs.len(), 4);
     assert_eq!(tabs[0].title, "Shell");
@@ -18,7 +18,7 @@ fn build_tab_specs_keeps_first_tab_as_shell() {
 
 #[test]
 fn build_tab_specs_autoruns_agents_in_remaining_tabs() {
-    let tabs = build_tab_specs(&Layout::B, &default_agents());
+    let tabs = build_tab_specs(&LayoutMode::LegacyB, &default_agents());
 
     assert_eq!(
         tabs[1].command.as_deref(),
@@ -31,7 +31,8 @@ fn build_tab_specs_autoruns_agents_in_remaining_tabs() {
 #[test]
 fn applescript_uses_working_directory_for_every_tab() {
     let script =
-        build_applescript(&Layout::B, &default_agents(), false, "/tmp/my-project").unwrap();
+        build_applescript(&LayoutMode::LegacyB, &default_agents(), false, "/tmp/my-project")
+            .unwrap();
 
     assert!(script.starts_with("tell application \"Finder\""));
     assert!(script.contains("tell application \"iTerm\""));
@@ -42,7 +43,8 @@ fn applescript_uses_working_directory_for_every_tab() {
 #[test]
 fn applescript_sends_agent_commands_to_splits() {
     let script =
-        build_applescript(&Layout::B, &default_agents(), false, "/tmp/my-project").unwrap();
+        build_applescript(&LayoutMode::LegacyB, &default_agents(), false, "/tmp/my-project")
+            .unwrap();
 
     assert!(script.contains("claude --dangerously-skip-permissions"));
     assert!(script.contains("codex --yolo"));
@@ -56,7 +58,8 @@ fn applescript_sends_agent_commands_to_splits() {
 #[test]
 fn layout_b_applescript_creates_three_splits_for_four_panes() {
     let script =
-        build_applescript(&Layout::B, &default_agents(), false, "/tmp/my-project").unwrap();
+        build_applescript(&LayoutMode::LegacyB, &default_agents(), false, "/tmp/my-project")
+            .unwrap();
 
     assert_eq!(
         script.matches("split ").count(),
@@ -68,7 +71,8 @@ fn layout_b_applescript_creates_three_splits_for_four_panes() {
 #[test]
 fn layout_a_applescript_uses_mixed_split_directions() {
     let script =
-        build_applescript(&Layout::A, &default_agents(), false, "/tmp/my-project").unwrap();
+        build_applescript(&LayoutMode::LegacyA, &default_agents(), false, "/tmp/my-project")
+            .unwrap();
 
     assert!(script.contains("split horizontally with default profile"));
     assert!(script.contains("split vertically with default profile"));
@@ -76,7 +80,9 @@ fn layout_a_applescript_uses_mixed_split_directions() {
 
 #[test]
 fn applescript_resizes_window_to_screen_bounds_when_maximized() {
-    let script = build_applescript(&Layout::B, &default_agents(), true, "/tmp/my-project").unwrap();
+    let script =
+        build_applescript(&LayoutMode::LegacyB, &default_agents(), true, "/tmp/my-project")
+            .unwrap();
 
     assert!(script.contains("tell application \"Finder\""));
     assert!(script.contains("set screenBounds to bounds of window of desktop"));
@@ -86,9 +92,41 @@ fn applescript_resizes_window_to_screen_bounds_when_maximized() {
 #[test]
 fn applescript_does_not_resize_window_when_not_maximized() {
     let script =
-        build_applescript(&Layout::B, &default_agents(), false, "/tmp/my-project").unwrap();
+        build_applescript(&LayoutMode::LegacyB, &default_agents(), false, "/tmp/my-project")
+            .unwrap();
 
     assert!(!script.contains("set bounds to screenBounds"));
+}
+
+#[test]
+fn build_tab_specs_supports_dynamic_layout() {
+    use multi_terminal::layout::LayoutType;
+
+    let layout = LayoutMode::Dynamic {
+        layout_type: LayoutType::MainTop,
+        pane_count: 5,
+    };
+    let specs = build_tab_specs(&layout, &layout.default_agents());
+
+    assert_eq!(specs.len(), 5);
+}
+
+#[test]
+fn build_applescript_supports_single_dynamic_pane() {
+    use multi_terminal::layout::LayoutType;
+
+    let layout = LayoutMode::Dynamic {
+        layout_type: LayoutType::Grid,
+        pane_count: 1,
+    };
+    let script =
+        build_applescript(&layout, &layout.default_agents(), false, "/tmp").unwrap();
+
+    assert!(script.contains("create window with default profile"));
+    assert!(
+        !script.contains("split "),
+        "single pane should not have any splits: {script}"
+    );
 }
 
 #[test]
