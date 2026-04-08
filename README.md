@@ -18,6 +18,7 @@ CLI em Rust para abrir 4 painéis de terminal com agentes de IA e comandos custo
   - pane 4: `qwen --yolo`
 - Permite desabilitar agentes, sobrescrever comandos por painel e definir títulos customizados.
 - Permite salvar layouts nomeados e recarregá-los depois.
+- Suporta o agente OpenCode como alternativa aos outros agentes de IA.
 
 ## Estratégia de execução
 
@@ -80,6 +81,13 @@ multi-terminal --maximize
 ```bash
 multi-terminal --no-claude
 multi-terminal --no-codex --no-qwen
+multi-terminal --no-opencode
+```
+
+### Usar OpenCode no painel 4
+
+```bash
+multi-terminal --pane4 "opencode --yolo" --title4 "OpenCode"
 ```
 
 ### Sobrescrever comandos por painel
@@ -150,7 +158,7 @@ Os layouts são persistidos no diretório de configuração do sistema em `multi
 ┌──────────────────┬──────────────────────────────┐
 │ Shell            │ Claude AI                    │
 ├──────────────────┼──────────────────────────────┤
-│ Codex            │ Qwen                         │
+│ Codex            │ Qwen / OpenCode              │
 └──────────────────┴──────────────────────────────┘
 ```
 
@@ -160,7 +168,7 @@ Os layouts são persistidos no diretório de configuração do sistema em `multi
 ┌──────────────┬──────────────────────────────────┐
 │ Shell        │ Claude AI                        │
 │              ├──────────────────────────────────┤
-│              │ Codex            │ Qwen          │
+│              │ Codex            │ Qwen/OpenCode  │
 └──────────────┴──────────────────────────────────┘
 ```
 

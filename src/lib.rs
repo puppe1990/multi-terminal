@@ -37,10 +37,7 @@ fn parse_pane_override(s: &str) -> Result<PaneOverride, String> {
 }
 
 #[derive(Parser, Debug, Clone)]
-#[command(
-    name = "multi-terminal",
-    about = "Opens terminal panes with AI agents"
-)]
+#[command(name = "multi-terminal", about = "Opens terminal panes with AI agents")]
 pub struct Args {
     /// Pane layout: a or b (default: b)
     #[arg(long, value_parser = parse_layout, default_value = "b")]
@@ -332,7 +329,7 @@ pub fn resolve_runtime_args(
         }
         None => {
             let maximize = !args.no_maximize;
-            
+
             // Determine layout mode from CLI args
             let layout_mode = if let Some(layout_type) = &args.layout_type {
                 let pane_count = args.pane_count.unwrap_or(4).max(1);
@@ -346,7 +343,7 @@ pub fn resolve_runtime_args(
                     Layout::B => LayoutMode::LegacyB,
                 }
             };
-            
+
             (layout_mode, None, maximize)
         }
     };
@@ -480,7 +477,8 @@ pub fn run(args: Args) {
     } else if cfg!(target_os = "macos") {
         if let Err(e) = crate::iterm::ensure_installed() {
             eprintln!("Error installing iTerm2 automatically: {}", e);
-        } else if let Err(e) = crate::iterm::run(&runtime.layout_mode, &runtime.agents, runtime.maximize)
+        } else if let Err(e) =
+            crate::iterm::run(&runtime.layout_mode, &runtime.agents, runtime.maximize)
         {
             eprintln!(
                 "iTerm2 installed but failed to open splits: {}. Trying tmux/PTY...",

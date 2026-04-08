@@ -67,9 +67,7 @@ fn build_commands_supports_dynamic_grid_layout() {
 
     assert!(cmds.iter().any(|cmd| cmd.contains("split-window")));
     assert_eq!(
-        cmds.iter()
-            .filter(|cmd| cmd.contains("send-keys"))
-            .count(),
+        cmds.iter().filter(|cmd| cmd.contains("send-keys")).count(),
         3
     );
 }

@@ -140,7 +140,7 @@ impl LayoutMode {
     pub fn default_agents(&self) -> Vec<AgentConfig> {
         let count = self.pane_count();
         let mut agents = vec![AgentConfig::new(AgentType::Shell); count];
-        
+
         // Assign default agents based on position
         if count > 1 {
             agents[1] = AgentConfig::new(AgentType::Claude);
@@ -151,7 +151,7 @@ impl LayoutMode {
         if count > 3 {
             agents[3] = AgentConfig::new(AgentType::Qwen);
         }
-        
+
         agents
     }
 }
@@ -264,7 +264,7 @@ impl SavedLayout {
 
     pub fn validate(&self) -> Result<(), String> {
         let layout_mode = self.to_layout_mode()?;
-        
+
         let expected = layout_mode.pane_count();
         if self.agents.len() != expected {
             return Err(format!(
@@ -276,16 +276,14 @@ impl SavedLayout {
 
         Ok(())
     }
-    
+
     pub fn to_layout_mode(&self) -> Result<LayoutMode, String> {
         match &self.layout {
-            SavedLayoutKind::Legacy(s) => {
-                match s.to_lowercase().as_str() {
-                    "a" => Ok(LayoutMode::LegacyA),
-                    "b" => Ok(LayoutMode::LegacyB),
-                    other => Err(format!("invalid saved layout '{}'", other)),
-                }
-            }
+            SavedLayoutKind::Legacy(s) => match s.to_lowercase().as_str() {
+                "a" => Ok(LayoutMode::LegacyA),
+                "b" => Ok(LayoutMode::LegacyB),
+                other => Err(format!("invalid saved layout '{}'", other)),
+            },
             SavedLayoutKind::Dynamic {
                 layout_type,
                 pane_count,
