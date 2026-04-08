@@ -192,7 +192,23 @@ fn resolve_runtime_args_builds_dynamic_defaults() {
         resolved.agents[1].effective_command().unwrap().program,
         "claude"
     );
-    assert!(resolved.agents[4].effective_command().is_none());
+    assert_eq!(
+        resolved.agents[4].effective_command().unwrap().program,
+        "opencode"
+    );
+}
+
+#[test]
+fn dynamic_defaults_assign_opencode_to_fifth_pane() {
+    let args = parse_args(&["multi-terminal", "--layout-type", "grid", "--panes", "5"]);
+
+    let resolved = resolve_runtime_args(&args, None).unwrap();
+
+    assert_eq!(
+        resolved.agents[4].effective_command().unwrap().program,
+        "opencode"
+    );
+    assert_eq!(resolved.agents[4].effective_title(), "OpenCode");
 }
 
 #[test]
@@ -266,6 +282,130 @@ fn resolve_runtime_args_uses_saved_dynamic_layout() {
 }
 
 #[test]
+fn resolve_runtime_args_uses_persisted_default_layout_when_no_cli_layout_is_provided() {
+    let args = parse_args(&["multi-terminal"]);
+    let saved = SavedLayout {
+        layout: multi_terminal::layout::SavedLayoutKind::Dynamic {
+            layout_type: LayoutType::MainLeft,
+            pane_count: 5,
+        },
+        agents: vec![
+            AgentConfig::new(AgentType::Shell),
+            AgentConfig::new(AgentType::Claude),
+            AgentConfig::new(AgentType::Custom("npm run dev".to_string())).with_title("App"),
+            AgentConfig::new(AgentType::Qwen),
+            AgentConfig::new(AgentType::OpenCode),
+        ],
+        maximize: false,
+    };
+
+    let resolved =
+        multi_terminal::resolve_runtime_args_with_defaults(&args, None, Some(saved)).unwrap();
+
+    assert_eq!(
+        resolved.layout_mode,
+        LayoutMode::Dynamic {
+            layout_type: LayoutType::MainLeft,
+            pane_count: 5,
+        }
+    );
+    assert_eq!(
+        resolved.agents[2].effective_command().unwrap().program,
+        "npm run dev"
+    );
+    assert_eq!(
+        resolved.agents[4].effective_command().unwrap().program,
+        "opencode"
+    );
+}
+
+#[test]
+fn cli_layout_overrides_persisted_default_layout() {
+    let args = parse_args(&["multi-terminal", "--layout-type", "grid", "--panes", "3"]);
+    let saved = SavedLayout {
+        layout: multi_terminal::layout::SavedLayoutKind::Dynamic {
+            layout_type: LayoutType::MainLeft,
+            pane_count: 5,
+        },
+        agents: vec![
+            AgentConfig::new(AgentType::Shell),
+            AgentConfig::new(AgentType::Claude),
+            AgentConfig::new(AgentType::Codex),
+            AgentConfig::new(AgentType::Qwen),
+            AgentConfig::new(AgentType::OpenCode),
+        ],
+        maximize: false,
+    };
+
+    let resolved =
+        multi_terminal::resolve_runtime_args_with_defaults(&args, None, Some(saved)).unwrap();
+
+    assert_eq!(
+        resolved.layout_mode,
+        LayoutMode::Dynamic {
+            layout_type: LayoutType::Grid,
+            pane_count: 3,
+        }
+    );
+    assert_eq!(resolved.agents.len(), 3);
+}
+
+#[test]
+fn loaded_layout_still_overrides_persisted_defaults() {
+    let args = parse_args(&["multi-terminal", "--load", "team"]);
+    let loaded = SavedLayout {
+        layout: multi_terminal::layout::SavedLayoutKind::Legacy("a".to_string()),
+        agents: Layout::A.default_agents(),
+        maximize: true,
+    };
+    let persisted = SavedLayout {
+        layout: multi_terminal::layout::SavedLayoutKind::Dynamic {
+            layout_type: LayoutType::Grid,
+            pane_count: 5,
+        },
+        agents: vec![
+            AgentConfig::new(AgentType::Shell),
+            AgentConfig::new(AgentType::Claude),
+            AgentConfig::new(AgentType::Codex),
+            AgentConfig::new(AgentType::Qwen),
+            AgentConfig::new(AgentType::OpenCode),
+        ],
+        maximize: false,
+    };
+
+    let resolved =
+        multi_terminal::resolve_runtime_args_with_defaults(&args, Some(loaded), Some(persisted))
+            .unwrap();
+
+    assert_eq!(resolved.layout_mode, LayoutMode::LegacyA);
+    assert_eq!(resolved.agents.len(), 4);
+    assert!(resolved.maximize);
+}
+
+#[test]
+fn no_opencode_disables_fifth_default_pane() {
+    let args = parse_args(&[
+        "multi-terminal",
+        "--layout-type",
+        "grid",
+        "--panes",
+        "5",
+        "--no-opencode",
+    ]);
+
+    let resolved = resolve_runtime_args(&args, None).unwrap();
+
+    assert!(resolved.agents[4].effective_command().is_none());
+}
+
+#[test]
+fn args_parse_set_default_flag() {
+    let args = parse_args(&["multi-terminal", "--set-default"]);
+
+    assert!(args.set_default);
+}
+
+#[test]
 fn saved_layout_validate_accepts_legacy_shape() {
     let saved = SavedLayout {
         layout: multi_terminal::layout::SavedLayoutKind::Legacy("b".to_string()),
@@ -312,4 +452,79 @@ fn saved_layout_rejects_dynamic_zero_panes() {
     let error = saved.validate().unwrap_err();
 
     assert!(error.contains("pane count must be at least 1"));
+}
+
+#[test]
+fn set_default_serializes_and_round_trips_correctly() {
+    let runtime = multi_terminal::resolve_runtime_args(
+        &parse_args(&[
+            "multi-terminal",
+            "--layout-type",
+            "grid",
+            "--panes",
+            "5",
+            "--pane",
+            "2=npm run dev",
+            "--title",
+            "2=App",
+        ]),
+        None,
+    )
+    .unwrap();
+
+    let saved = multi_terminal::layout::SavedLayout {
+        layout: match runtime.layout_mode {
+            LayoutMode::LegacyA => multi_terminal::layout::SavedLayoutKind::Legacy("a".to_string()),
+            LayoutMode::LegacyB => multi_terminal::layout::SavedLayoutKind::Legacy("b".to_string()),
+            LayoutMode::Dynamic {
+                ref layout_type,
+                pane_count,
+            } => multi_terminal::layout::SavedLayoutKind::Dynamic {
+                layout_type: layout_type.clone(),
+                pane_count,
+            },
+        },
+        agents: runtime.agents.clone(),
+        maximize: runtime.maximize,
+    };
+
+    let serialized = serde_json::to_string_pretty(&saved).unwrap();
+    let deserialized: multi_terminal::layout::SavedLayout =
+        serde_json::from_str(&serialized).unwrap();
+
+    assert!(deserialized.validate().is_ok());
+    assert_eq!(deserialized.agents.len(), 5);
+    assert_eq!(
+        deserialized.agents[1].effective_command().unwrap().program,
+        "npm run dev"
+    );
+    assert_eq!(deserialized.agents[1].effective_title(), "App");
+}
+
+#[test]
+fn set_default_handles_corrupted_config_file_gracefully() {
+    let path = SavedLayout::default_config_path();
+    let parent = path.parent().unwrap().to_path_buf();
+
+    std::fs::create_dir_all(&parent).ok();
+
+    let backup = if path.exists() {
+        let backup_path = path.with_extension("json.bak");
+        std::fs::copy(&path, &backup_path).ok();
+        Some(backup_path)
+    } else {
+        None
+    };
+
+    std::fs::write(&path, "{ invalid json }").ok();
+
+    let result = SavedLayout::load_default();
+    assert!(result.is_err());
+
+    if let Some(backup_path) = backup {
+        std::fs::copy(&backup_path, &path).ok();
+        std::fs::remove_file(&backup_path).ok();
+    } else if path.exists() {
+        std::fs::remove_file(&path).ok();
+    }
 }

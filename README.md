@@ -18,8 +18,10 @@ CLI em Rust para abrir múltiplos panes de terminal com agentes de IA e comandos
   - pane 2: `claude --dangerously-skip-permissions`
   - pane 3: `codex --yolo`
   - pane 4: `qwen --yolo`
-  - pane 5+: shell livre
+  - pane 5: `opencode --yolo`
+  - pane 6+: shell livre
 - Permite sobrescrever comando e título por índice
+- Permite persistir defaults globais via CLI com `--set-default`
 - Permite salvar layouts nomeados e recarregá-los depois
 - Mantém compatibilidade com `--layout a` e `--layout b`
 
@@ -75,6 +77,7 @@ Atalho local do repositório:
 multi-terminal
 multi-terminal --layout-type grid --panes 6
 multi-terminal --layout-type main-left --panes 5 --maximize
+multi-terminal --set-default --layout-type grid --panes 5 --pane 2="npm run dev"
 ```
 
 ## Flags principais
@@ -113,7 +116,29 @@ multi-terminal --no-codex --no-qwen
 multi-terminal --no-opencode
 ```
 
-Essas flags continuam afetando apenas os panes padrão iniciais.
+Essas flags continuam afetando apenas os panes padrão iniciais. `--no-opencode` desabilita o pane 5 padrão quando ele existir.
+
+### Persistir defaults globais
+
+Use `--set-default` para salvar o layout padrão usado quando `multi-terminal` roda sem `--load`, `--layout` ou `--layout-type`.
+
+```bash
+multi-terminal \
+  --set-default \
+  --layout-type grid \
+  --panes 5 \
+  --pane 2="npm run dev" \
+  --title 2=App \
+  --pane 5="opencode --yolo" \
+  --title 5=OpenCode
+```
+
+Precedência da configuração:
+
+- flags da execução atual
+- layout carregado com `--load`
+- default persistido com `--set-default`
+- defaults hardcoded do app
 
 ## Layouts salvos
 
@@ -147,6 +172,8 @@ multi-terminal --load team --pane 5=lazygit --title 5=Git
 ```
 
 Os layouts são persistidos no diretório de configuração do sistema em `multi-terminal/layouts.json`.
+
+O default global é persistido separadamente em `multi-terminal/default.json`.
 
 ## Compatibilidade legada
 

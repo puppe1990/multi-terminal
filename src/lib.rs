@@ -100,7 +100,7 @@ pub struct Args {
     pub title4: Option<String>,
 
     /// Open maximized/fullscreen window (default: true)
-    #[arg(long, default_value = "true", action = clap::ArgAction::Set)]
+    #[arg(long, action = clap::ArgAction::SetTrue)]
     pub maximize: bool,
 
     /// Don't maximize the window
@@ -110,6 +110,10 @@ pub struct Args {
     /// Save current configuration as a named layout
     #[arg(long)]
     pub save: Option<String>,
+
+    /// Persist the resolved configuration as the default startup layout
+    #[arg(long)]
+    pub set_default: bool,
 
     /// Load a previously saved layout by name
     #[arg(long)]
@@ -177,9 +181,6 @@ pub fn resolve_agents(
     if args.no_qwen {
         agents[3] = AgentConfig::new(AgentType::Shell);
     }
-    if args.no_opencode {
-        agents[3] = AgentConfig::new(AgentType::Shell);
-    }
 
     // Apply --paneN custom commands
     if let Some(cmd) = &args.pane1 {
@@ -242,8 +243,8 @@ pub fn resolve_agents_dynamic(
     if pane_count > 3 && args.no_qwen {
         agents[3] = AgentConfig::new(AgentType::Shell);
     }
-    if pane_count > 3 && args.no_opencode {
-        agents[3] = AgentConfig::new(AgentType::Shell);
+    if pane_count > 4 && args.no_opencode {
+        agents[4] = AgentConfig::new(AgentType::Shell);
     }
 
     // Apply --paneN custom commands (only for first 4 panes)
@@ -313,23 +314,40 @@ pub fn resolve_agents_dynamic(
     Ok(agents)
 }
 
-pub fn resolve_runtime_args(
+fn args_define_layout(args: &Args) -> bool {
+    args.layout.is_some() || args.layout_type.is_some()
+}
+
+fn resolve_maximize(args: &Args, base_maximize: Option<bool>) -> bool {
+    if args.no_maximize {
+        false
+    } else if args.maximize {
+        true
+    } else {
+        base_maximize.unwrap_or(true)
+    }
+}
+
+pub fn resolve_runtime_args_with_defaults(
     args: &Args,
     saved: Option<SavedLayout>,
+    persisted_default: Option<SavedLayout>,
 ) -> Result<RuntimeArgs, String> {
+    let saved = match saved {
+        Some(saved) => Some(saved),
+        None if !args_define_layout(args) => persisted_default,
+        None => None,
+    };
+
     let (layout_mode, base_agents, maximize) = match saved {
         Some(saved) => {
             saved.validate()?;
             let layout_mode = saved.to_layout_mode()?;
-            let maximize = if args.no_maximize {
-                false
-            } else {
-                saved.maximize || args.maximize
-            };
+            let maximize = resolve_maximize(args, Some(saved.maximize));
             (layout_mode, Some(saved.agents), maximize)
         }
         None => {
-            let maximize = !args.no_maximize;
+            let maximize = resolve_maximize(args, None);
 
             // Determine layout mode from CLI args
             let layout_mode = if let Some(layout_type) = &args.layout_type {
@@ -362,6 +380,33 @@ pub fn resolve_runtime_args(
         agents,
         maximize: effective_args.maximize,
     })
+}
+
+pub fn resolve_runtime_args(
+    args: &Args,
+    saved: Option<SavedLayout>,
+) -> Result<RuntimeArgs, String> {
+    resolve_runtime_args_with_defaults(args, saved, None)
+}
+
+fn saved_layout_from_runtime(runtime: &RuntimeArgs) -> SavedLayout {
+    let layout_kind = match runtime.layout_mode {
+        LayoutMode::LegacyA => layout::SavedLayoutKind::Legacy("a".to_string()),
+        LayoutMode::LegacyB => layout::SavedLayoutKind::Legacy("b".to_string()),
+        LayoutMode::Dynamic {
+            ref layout_type,
+            pane_count,
+        } => layout::SavedLayoutKind::Dynamic {
+            layout_type: layout_type.clone(),
+            pane_count,
+        },
+    };
+
+    SavedLayout {
+        layout: layout_kind,
+        agents: runtime.agents.clone(),
+        maximize: runtime.maximize,
+    }
 }
 
 pub fn run(args: Args) {
@@ -403,16 +448,20 @@ pub fn run(args: Args) {
         }
     }
 
-    // Handle --load
-    let runtime = if let Some(ref name) = args.load {
+    let persisted_default = match SavedLayout::load_default() {
+        Ok(saved) => saved,
+        Err(e) => {
+            eprintln!(
+                "Warning: could not load default configuration, using defaults: {}",
+                e
+            );
+            None
+        }
+    };
+
+    let loaded_layout = if let Some(ref name) = args.load {
         match SavedLayout::load(name) {
-            Ok(Some(saved)) => match resolve_runtime_args(&args, Some(saved)) {
-                Ok(runtime) => runtime,
-                Err(e) => {
-                    eprintln!("Error loading layout: {}", e);
-                    std::process::exit(1);
-                }
-            },
+            Ok(Some(saved)) => Some(saved),
             Ok(None) => {
                 eprintln!("Layout '{}' not found.", name);
                 std::process::exit(1);
@@ -423,34 +472,32 @@ pub fn run(args: Args) {
             }
         }
     } else {
-        match resolve_runtime_args(&args, None) {
-            Ok(runtime) => runtime,
-            Err(e) => {
-                eprintln!("Error resolving runtime configuration: {}", e);
-                std::process::exit(1);
-            }
+        None
+    };
+
+    let runtime = match resolve_runtime_args_with_defaults(&args, loaded_layout, persisted_default)
+    {
+        Ok(runtime) => runtime,
+        Err(e) => {
+            eprintln!("Error resolving runtime configuration: {}", e);
+            std::process::exit(1);
         }
     };
 
+    if args.set_default {
+        let saved = saved_layout_from_runtime(&runtime);
+
+        if let Err(e) = saved.save_default() {
+            eprintln!("Error saving default configuration: {}", e);
+            std::process::exit(1);
+        }
+        println!("Default configuration saved successfully.");
+        return;
+    }
+
     // Handle --save
     if let Some(ref name) = args.save {
-        let layout_kind = match runtime.layout_mode {
-            LayoutMode::LegacyA => layout::SavedLayoutKind::Legacy("a".to_string()),
-            LayoutMode::LegacyB => layout::SavedLayoutKind::Legacy("b".to_string()),
-            LayoutMode::Dynamic {
-                ref layout_type,
-                pane_count,
-            } => layout::SavedLayoutKind::Dynamic {
-                layout_type: layout_type.clone(),
-                pane_count,
-            },
-        };
-
-        let saved = SavedLayout {
-            layout: layout_kind,
-            agents: runtime.agents.clone(),
-            maximize: runtime.maximize,
-        };
+        let saved = saved_layout_from_runtime(&runtime);
 
         if let Err(e) = saved.save(name) {
             eprintln!("Error saving layout: {}", e);

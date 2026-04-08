@@ -164,6 +164,9 @@ impl LayoutMode {
         if count > 3 {
             agents[3] = AgentConfig::new(AgentType::Qwen);
         }
+        if count > 4 {
+            agents[4] = AgentConfig::new(AgentType::OpenCode);
+        }
 
         agents
     }
@@ -266,9 +269,17 @@ pub struct SavedLayout {
 
 impl SavedLayout {
     pub fn config_path() -> std::path::PathBuf {
+        Self::config_path_for("layouts.json")
+    }
+
+    pub fn default_config_path() -> std::path::PathBuf {
+        Self::config_path_for("default.json")
+    }
+
+    fn config_path_for(file_name: &str) -> std::path::PathBuf {
         let mut path = dirs::config_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
         path.push("multi-terminal");
-        path.push("layouts.json");
+        path.push(file_name);
         path
     }
 
@@ -290,6 +301,21 @@ impl SavedLayout {
     pub fn load(name: &str) -> Result<Option<SavedLayout>, String> {
         let layouts = Self::load_all()?;
         Ok(layouts.into_iter().find(|(n, _)| n == name).map(|(_, l)| l))
+    }
+
+    pub fn load_default() -> Result<Option<SavedLayout>, String> {
+        let path = Self::default_config_path();
+        if !path.exists() {
+            return Ok(None);
+        }
+
+        let content = std::fs::read_to_string(&path)
+            .map_err(|e| format!("Failed to read default config: {}", e))?;
+
+        let saved: SavedLayout = serde_json::from_str(&content)
+            .map_err(|e| format!("Failed to parse default config: {}", e))?;
+
+        Ok(Some(saved))
     }
 
     pub fn save(&self, name: &str) -> Result<(), String> {
@@ -314,6 +340,22 @@ impl SavedLayout {
 
         std::fs::write(&path, content)
             .map_err(|e| format!("Failed to write layout config: {}", e))?;
+
+        Ok(())
+    }
+
+    pub fn save_default(&self) -> Result<(), String> {
+        let path = Self::default_config_path();
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create config dir: {}", e))?;
+        }
+
+        let content = serde_json::to_string_pretty(self)
+            .map_err(|e| format!("Failed to serialize default config: {}", e))?;
+
+        std::fs::write(&path, content)
+            .map_err(|e| format!("Failed to write default config: {}", e))?;
 
         Ok(())
     }
