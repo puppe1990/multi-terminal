@@ -166,3 +166,19 @@ cargo fmt --all
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test
 ```
+
+## Pre-commit hook
+
+Ative o hook versionado deste repositório:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Depois disso, cada `git commit` vai executar:
+
+```bash
+cargo fmt --all --check
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test
+```

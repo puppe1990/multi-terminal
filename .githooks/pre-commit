@@ -1,0 +1,12 @@
+#!/bin/sh
+
+set -eu
+
+echo "pre-commit: checking formatting"
+cargo fmt --all --check
+
+echo "pre-commit: running clippy"
+cargo clippy --all-targets --all-features -- -D warnings
+
+echo "pre-commit: running tests"
+cargo test
