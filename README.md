@@ -2,6 +2,10 @@
 
 CLI em Rust para abrir 4 painéis de terminal com agentes de IA e comandos customizáveis.
 
+## Preview
+
+![Preview do multi-terminal](docs/images/multi-terminal-screenshot.png)
+
 ## O que faz
 
 - Suporta dois layouts:
