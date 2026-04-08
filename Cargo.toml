@@ -3,6 +3,10 @@ name = "multi-terminal"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "multi_terminal"
+path = "src/main.rs"
+
 [[bin]]
 name = "multi-terminal"
 path = "src/main.rs"
