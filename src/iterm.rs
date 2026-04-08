@@ -1,4 +1,4 @@
-use crate::layout::{AgentConfig, LayoutMode};
+use crate::layout::{AgentConfig, LayoutMode, SplitDirection};
 use std::path::Path;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -14,16 +14,11 @@ pub struct ShellCommand {
 }
 
 pub fn build_tab_specs(layout_mode: &LayoutMode, agents: &[AgentConfig]) -> Vec<TabSpec> {
-    // Convert LayoutMode to Layout for now (will be updated in later tasks)
-    let layout = match layout_mode {
-        LayoutMode::LegacyA => crate::layout::Layout::A,
-        LayoutMode::LegacyB => crate::layout::Layout::B,
-        LayoutMode::Dynamic { .. } => crate::layout::Layout::B, // Default to B for now
-    };
+    let _ = layout_mode;
 
-    layout
-        .panes(agents)
-        .into_iter()
+    agents
+        .iter()
+        .cloned()
         .enumerate()
         .map(|(index, agent)| {
             let cmd = agent.effective_command();
@@ -45,15 +40,7 @@ pub fn build_applescript(
         return Err("current directory empty".to_string());
     }
 
-    // Convert LayoutMode to Layout for now
-    let layout = match layout_mode {
-        LayoutMode::LegacyA => crate::layout::Layout::A,
-        LayoutMode::LegacyB => crate::layout::Layout::B,
-        LayoutMode::Dynamic { .. } => crate::layout::Layout::B, // Default to B for now
-    };
-
     let panes = build_tab_specs(layout_mode, agents);
-    let pane_count = layout_mode.pane_count();
     let mut lines = vec![
         r#"tell application "Finder""#.to_string(),
         "  set screenBounds to bounds of window of desktop".to_string(),
@@ -68,45 +55,19 @@ pub fn build_applescript(
         lines.push("    set bounds to screenBounds".to_string());
     }
 
-    // Single pane: no splits needed
-    if pane_count == 1 {
-        lines.push("    set pane0 to current session".to_string());
-    } else {
-        lines.push("    set pane0 to current session".to_string());
+    lines.push("    set pane0 to current session".to_string());
+    for split in layout_mode.split_operations() {
+        let split_command = match split.direction {
+            SplitDirection::Horizontal => "split horizontally with default profile",
+            SplitDirection::Vertical => "split vertically with default profile",
+        };
 
-        match layout {
-            crate::layout::Layout::B => {
-                lines.push("    tell pane0".to_string());
-                lines.push(
-                    "      set pane1 to (split horizontally with default profile)".to_string(),
-                );
-                lines.push("    end tell".to_string());
-                lines.push("    tell pane0".to_string());
-                lines
-                    .push("      set pane2 to (split vertically with default profile)".to_string());
-                lines.push("    end tell".to_string());
-                lines.push("    tell pane1".to_string());
-                lines
-                    .push("      set pane3 to (split vertically with default profile)".to_string());
-                lines.push("    end tell".to_string());
-            }
-            crate::layout::Layout::A => {
-                lines.push("    tell pane0".to_string());
-                lines.push(
-                    "      set pane1 to (split horizontally with default profile)".to_string(),
-                );
-                lines.push("    end tell".to_string());
-                lines.push("    tell pane1".to_string());
-                lines
-                    .push("      set pane2 to (split vertically with default profile)".to_string());
-                lines.push("    end tell".to_string());
-                lines.push("    tell pane2".to_string());
-                lines.push(
-                    "      set pane3 to (split horizontally with default profile)".to_string(),
-                );
-                lines.push("    end tell".to_string());
-            }
-        }
+        lines.push(format!("    tell pane{}", split.parent));
+        lines.push(format!(
+            "      set pane{} to ({})",
+            split.new_index, split_command
+        ));
+        lines.push("    end tell".to_string());
     }
 
     // Set custom names for each pane

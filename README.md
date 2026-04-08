@@ -1,6 +1,6 @@
 # multi-terminal
 
-CLI em Rust para abrir 4 painéis de terminal com agentes de IA e comandos customizáveis.
+CLI em Rust para abrir múltiplos panes de terminal com agentes de IA e comandos customizáveis.
 
 ## Preview
 
@@ -8,17 +8,20 @@ CLI em Rust para abrir 4 painéis de terminal com agentes de IA e comandos custo
 
 ## O que faz
 
-- Suporta dois layouts:
-  - `b` (padrão): grade 2x2
-  - `a`: coluna esquerda alta + três painéis na direita
+- Suporta layouts dinâmicos:
+  - `grid`
+  - `main-left`
+  - `main-top`
+- Aceita quantidade variável de panes com `--panes`
 - Inicia, por padrão:
   - pane 1: shell livre
   - pane 2: `claude --dangerously-skip-permissions`
   - pane 3: `codex --yolo`
   - pane 4: `qwen --yolo`
-- Permite desabilitar agentes, sobrescrever comandos por painel e definir títulos customizados.
-- Permite salvar layouts nomeados e recarregá-los depois.
-- Suporta o agente OpenCode como alternativa aos outros agentes de IA.
+  - pane 5+: shell livre
+- Permite sobrescrever comando e título por índice
+- Permite salvar layouts nomeados e recarregá-los depois
+- Mantém compatibilidade com `--layout a` e `--layout b`
 
 ## Estratégia de execução
 
@@ -37,14 +40,14 @@ O terminal precisa ter no mínimo `80x24`.
 
 ```bash
 cargo run
-cargo run -- --layout a
+cargo run -- --layout-type grid --panes 6
 ```
 
 ### Binário compilado
 
 ```bash
 ./target/debug/multi-terminal
-./target/debug/multi-terminal --layout a
+./target/debug/multi-terminal --layout-type main-left --panes 5
 ```
 
 ### Instalação global
@@ -57,7 +60,7 @@ Depois:
 
 ```bash
 multi-terminal
-multi-terminal --layout a
+multi-terminal --layout-type main-top --panes 7
 ```
 
 Atalho local do repositório:
@@ -70,11 +73,37 @@ Atalho local do repositório:
 
 ```bash
 multi-terminal
-multi-terminal --layout a
-multi-terminal --maximize
+multi-terminal --layout-type grid --panes 6
+multi-terminal --layout-type main-left --panes 5 --maximize
 ```
 
 ## Flags principais
+
+### Layout dinâmico
+
+```bash
+multi-terminal --layout-type grid --panes 6
+multi-terminal --layout-type main-left --panes 5
+multi-terminal --layout-type main-top --panes 7
+```
+
+`--panes` exige `--layout-type`.
+
+### Sobrescrever panes por índice
+
+Os panes são indexados a partir de `1`.
+
+```bash
+multi-terminal \
+  --layout-type grid \
+  --panes 6 \
+  --pane 2="npm run dev" \
+  --pane 5="htop" \
+  --title 2=App \
+  --title 5=Monitor
+```
+
+Se `--pane INDEX=...` for usado sem `--title INDEX=...`, o próprio comando vira o título padrão daquele pane.
 
 ### Desabilitar agentes padrão
 
@@ -84,49 +113,18 @@ multi-terminal --no-codex --no-qwen
 multi-terminal --no-opencode
 ```
 
-### Usar OpenCode no painel 4
-
-```bash
-multi-terminal --pane4 "opencode --yolo" --title4 "OpenCode"
-```
-
-### Sobrescrever comandos por painel
-
-Os painéis são indexados de `1` a `4`:
-
-- layout `b`: `top-left`, `top-right`, `bottom-left`, `bottom-right`
-- layout `a`: `left`, `right-top`, `right-bottom-left`, `right-bottom-right`
-
-```bash
-multi-terminal \
-  --pane1 "lazygit" \
-  --pane2 "npm run dev" \
-  --pane3 "cargo test -- --nocapture" \
-  --pane4 "htop"
-```
-
-### Definir títulos customizados
-
-```bash
-multi-terminal \
-  --title1 "Git" \
-  --title2 "App" \
-  --title3 "Tests" \
-  --title4 "Monitor"
-```
-
-Se `--paneN` e `--titleN` forem usados juntos, o título customizado é aplicado ao comando daquele painel.
+Essas flags continuam afetando apenas os panes padrão iniciais.
 
 ## Layouts salvos
 
-Salvar uma configuração:
+Salvar uma configuração dinâmica:
 
 ```bash
 multi-terminal \
-  --layout a \
-  --pane2 "npm run dev" \
-  --title2 "App" \
-  --maximize \
+  --layout-type main-left \
+  --panes 5 \
+  --pane 2="npm run dev" \
+  --title 2=App \
   --save team
 ```
 
@@ -145,32 +143,21 @@ multi-terminal --load team
 Overrides via CLI continuam valendo ao carregar um layout salvo:
 
 ```bash
-multi-terminal --load team --pane2 "lazygit" --title2 "Git" --no-qwen
+multi-terminal --load team --pane 5=lazygit --title 5=Git
 ```
 
 Os layouts são persistidos no diretório de configuração do sistema em `multi-terminal/layouts.json`.
 
-## Layouts padrão
+## Compatibilidade legada
 
-### Layout B
+Os layouts antigos ainda funcionam:
 
-```text
-┌──────────────────┬──────────────────────────────┐
-│ Shell            │ Claude AI                    │
-├──────────────────┼──────────────────────────────┤
-│ Codex            │ Qwen / OpenCode              │
-└──────────────────┴──────────────────────────────┘
+```bash
+multi-terminal --layout a
+multi-terminal --layout b
 ```
 
-### Layout A
-
-```text
-┌──────────────┬──────────────────────────────────┐
-│ Shell        │ Claude AI                        │
-│              ├──────────────────────────────────┤
-│              │ Codex            │ Qwen/OpenCode  │
-└──────────────┴──────────────────────────────────┘
-```
+Os flags legados `--pane1` a `--pane4` e `--title1` a `--title4` continuam aceitos para o modo legado e para os quatro primeiros panes.
 
 ## Desenvolvimento
 

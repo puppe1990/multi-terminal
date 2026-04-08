@@ -1,5 +1,6 @@
+use clap::Parser;
 use multi_terminal::layout::{AgentConfig, AgentType, Layout, LayoutMode, LayoutType, SavedLayout};
-use multi_terminal::{parse_args, resolve_agents, resolve_runtime_args};
+use multi_terminal::{parse_args, resolve_agents, resolve_runtime_args, Args};
 
 fn default_agents() -> Vec<AgentConfig> {
     Layout::B.default_agents()
@@ -55,20 +56,22 @@ fn layout_a_pane0_is_free() {
 
 #[test]
 fn default_layout_is_b() {
-    let args = parse_args(&["multi-terminal"]);
-    assert_eq!(args.layout, Layout::B);
+    let resolved = resolve_runtime_args(&parse_args(&["multi-terminal"]), None).unwrap();
+    assert_eq!(resolved.layout_mode, LayoutMode::LegacyB);
 }
 
 #[test]
 fn flag_layout_a_selects_layout_a() {
-    let args = parse_args(&["multi-terminal", "--layout", "a"]);
-    assert_eq!(args.layout, Layout::A);
+    let resolved =
+        resolve_runtime_args(&parse_args(&["multi-terminal", "--layout", "a"]), None).unwrap();
+    assert_eq!(resolved.layout_mode, LayoutMode::LegacyA);
 }
 
 #[test]
 fn flag_layout_b_selects_layout_b() {
-    let args = parse_args(&["multi-terminal", "--layout", "b"]);
-    assert_eq!(args.layout, Layout::B);
+    let resolved =
+        resolve_runtime_args(&parse_args(&["multi-terminal", "--layout", "b"]), None).unwrap();
+    assert_eq!(resolved.layout_mode, LayoutMode::LegacyB);
 }
 
 #[test]
@@ -158,13 +161,7 @@ fn resolve_agents_applies_cli_overrides_without_loaded_layout() {
 
 #[test]
 fn parse_args_supports_layout_type_and_panes() {
-    let args = parse_args(&[
-        "multi-terminal",
-        "--layout-type",
-        "grid",
-        "--pane-count",
-        "6",
-    ]);
+    let args = parse_args(&["multi-terminal", "--layout-type", "grid", "--panes", "6"]);
 
     assert_eq!(args.layout_type, Some(LayoutType::Grid));
     assert_eq!(args.pane_count, Some(6));
@@ -176,7 +173,7 @@ fn resolve_runtime_args_builds_dynamic_defaults() {
         "multi-terminal",
         "--layout-type",
         "main-left",
-        "--pane-count",
+        "--panes",
         "5",
     ]);
 
@@ -204,7 +201,7 @@ fn resolve_agents_applies_indexed_pane_override() {
         "multi-terminal",
         "--layout-type",
         "grid",
-        "--pane-count",
+        "--panes",
         "6",
         "--pane",
         "5=htop",
@@ -227,7 +224,7 @@ fn resolve_runtime_args_rejects_override_out_of_bounds() {
         "multi-terminal",
         "--layout-type",
         "grid",
-        "--pane-count",
+        "--panes",
         "3",
         "--pane",
         "4=lazygit",
@@ -277,4 +274,42 @@ fn saved_layout_validate_accepts_legacy_shape() {
     };
 
     assert!(saved.validate().is_ok());
+}
+
+#[test]
+fn pane_count_requires_layout_type() {
+    let result = Args::try_parse_from(["multi-terminal", "--panes", "6"]);
+
+    assert!(result.is_err());
+}
+
+#[test]
+fn layout_conflicts_with_layout_type() {
+    let result = Args::try_parse_from([
+        "multi-terminal",
+        "--layout",
+        "a",
+        "--layout-type",
+        "grid",
+        "--panes",
+        "6",
+    ]);
+
+    assert!(result.is_err());
+}
+
+#[test]
+fn saved_layout_rejects_dynamic_zero_panes() {
+    let saved = SavedLayout {
+        layout: multi_terminal::layout::SavedLayoutKind::Dynamic {
+            layout_type: LayoutType::Grid,
+            pane_count: 0,
+        },
+        agents: vec![],
+        maximize: false,
+    };
+
+    let error = saved.validate().unwrap_err();
+
+    assert!(error.contains("pane count must be at least 1"));
 }

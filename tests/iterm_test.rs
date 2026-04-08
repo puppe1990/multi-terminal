@@ -153,6 +153,20 @@ fn build_applescript_supports_single_dynamic_pane() {
 }
 
 #[test]
+fn build_applescript_supports_dynamic_layout_with_more_than_four_panes() {
+    use multi_terminal::layout::LayoutType;
+
+    let layout = LayoutMode::Dynamic {
+        layout_type: LayoutType::Grid,
+        pane_count: 5,
+    };
+    let script = build_applescript(&layout, &layout.default_agents(), false, "/tmp").unwrap();
+
+    assert_eq!(script.matches("split ").count(), 4);
+    assert!(script.contains("tell pane4"));
+}
+
+#[test]
 fn iterm_path_detection_checks_candidate_paths() {
     let missing = ["/definitely/missing/iTerm.app"];
     assert!(!app_exists_in_paths(&missing));

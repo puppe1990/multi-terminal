@@ -40,15 +40,15 @@ fn parse_pane_override(s: &str) -> Result<PaneOverride, String> {
 #[command(name = "multi-terminal", about = "Opens terminal panes with AI agents")]
 pub struct Args {
     /// Pane layout: a or b (default: b)
-    #[arg(long, value_parser = parse_layout, default_value = "b")]
-    pub layout: Layout,
+    #[arg(long, value_parser = parse_layout, conflicts_with = "layout_type")]
+    pub layout: Option<Layout>,
 
     /// Layout type for dynamic panes: grid, main-left, main-top
-    #[arg(long, value_parser = parse_layout_type)]
+    #[arg(long, value_parser = parse_layout_type, conflicts_with = "layout")]
     pub layout_type: Option<LayoutType>,
 
     /// Number of panes for dynamic layouts (default: 4)
-    #[arg(long = "pane-count")]
+    #[arg(long = "panes", alias = "pane-count", requires = "layout_type")]
     pub pane_count: Option<usize>,
 
     /// Disable Claude agent
@@ -156,12 +156,13 @@ pub fn resolve_agents(
     args: &Args,
     base_agents: Option<Vec<AgentConfig>>,
 ) -> Result<Vec<AgentConfig>, String> {
-    let mut agents = base_agents.unwrap_or_else(|| args.layout.default_agents());
+    let layout = args.layout.clone().unwrap_or(Layout::B);
+    let mut agents = base_agents.unwrap_or_else(|| layout.default_agents());
 
-    if agents.len() != args.layout.expected_pane_count() {
+    if agents.len() != layout.expected_pane_count() {
         return Err(format!(
             "invalid agent configuration: expected {} panes, got {}",
-            args.layout.expected_pane_count(),
+            layout.expected_pane_count(),
             agents.len()
         ));
     }
@@ -338,7 +339,7 @@ pub fn resolve_runtime_args(
                     pane_count,
                 }
             } else {
-                match args.layout {
+                match args.layout.clone().unwrap_or(Layout::B) {
                     Layout::A => LayoutMode::LegacyA,
                     Layout::B => LayoutMode::LegacyB,
                 }

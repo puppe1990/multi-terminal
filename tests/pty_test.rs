@@ -158,4 +158,23 @@ fn compute_geometry_main_left_supports_five_panes() {
 
     assert_eq!(panes.len(), 5);
     assert!(panes[0].width > panes[1].width);
+    assert_ne!(panes[1].col, panes[2].col);
+    assert_ne!(panes[1].row, panes[3].row);
+}
+
+#[test]
+fn compute_geometry_main_top_uses_subgrid_for_remaining_panes() {
+    let panes = compute_geometry(
+        &LayoutMode::Dynamic {
+            layout_type: LayoutType::MainTop,
+            pane_count: 5,
+        },
+        120,
+        40,
+    );
+
+    assert_eq!(panes.len(), 5);
+    assert!(panes[0].height > panes[1].height);
+    assert_ne!(panes[1].col, panes[2].col);
+    assert_ne!(panes[1].row, panes[3].row);
 }

@@ -84,3 +84,45 @@ fn build_commands_supports_single_pane_layout() {
 
     assert!(!cmds.iter().any(|cmd| cmd.contains("split-window")));
 }
+
+#[test]
+fn build_commands_main_left_uses_subgrid_splits() {
+    let layout = LayoutMode::Dynamic {
+        layout_type: LayoutType::MainLeft,
+        pane_count: 5,
+    };
+
+    let cmds = build_commands(&layout, &layout.default_agents(), "subgrid");
+    let horizontal_splits = cmds
+        .iter()
+        .filter(|cmd| cmd.contains("split-window -h"))
+        .count();
+    let vertical_splits = cmds
+        .iter()
+        .filter(|cmd| cmd.contains("split-window -v"))
+        .count();
+
+    assert_eq!(horizontal_splits, 2);
+    assert_eq!(vertical_splits, 2);
+}
+
+#[test]
+fn build_commands_main_top_uses_subgrid_splits() {
+    let layout = LayoutMode::Dynamic {
+        layout_type: LayoutType::MainTop,
+        pane_count: 5,
+    };
+
+    let cmds = build_commands(&layout, &layout.default_agents(), "subgrid");
+    let horizontal_splits = cmds
+        .iter()
+        .filter(|cmd| cmd.contains("split-window -h"))
+        .count();
+    let vertical_splits = cmds
+        .iter()
+        .filter(|cmd| cmd.contains("split-window -v"))
+        .count();
+
+    assert_eq!(horizontal_splits, 1);
+    assert_eq!(vertical_splits, 3);
+}

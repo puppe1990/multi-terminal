@@ -119,6 +119,19 @@ pub enum LayoutType {
     MainTop,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SplitDirection {
+    Horizontal,
+    Vertical,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SplitOperation {
+    pub parent: usize,
+    pub new_index: usize,
+    pub direction: SplitDirection,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LayoutMode {
     LegacyA,
@@ -153,6 +166,49 @@ impl LayoutMode {
         }
 
         agents
+    }
+
+    pub fn split_operations(&self) -> Vec<SplitOperation> {
+        match self {
+            LayoutMode::LegacyA => vec![
+                SplitOperation {
+                    parent: 0,
+                    new_index: 1,
+                    direction: SplitDirection::Horizontal,
+                },
+                SplitOperation {
+                    parent: 1,
+                    new_index: 2,
+                    direction: SplitDirection::Vertical,
+                },
+                SplitOperation {
+                    parent: 2,
+                    new_index: 3,
+                    direction: SplitDirection::Horizontal,
+                },
+            ],
+            LayoutMode::LegacyB => vec![
+                SplitOperation {
+                    parent: 0,
+                    new_index: 1,
+                    direction: SplitDirection::Horizontal,
+                },
+                SplitOperation {
+                    parent: 0,
+                    new_index: 2,
+                    direction: SplitDirection::Vertical,
+                },
+                SplitOperation {
+                    parent: 1,
+                    new_index: 3,
+                    direction: SplitDirection::Vertical,
+                },
+            ],
+            LayoutMode::Dynamic {
+                layout_type,
+                pane_count,
+            } => dynamic_split_operations(layout_type, *pane_count),
+        }
     }
 }
 
@@ -287,10 +343,120 @@ impl SavedLayout {
             SavedLayoutKind::Dynamic {
                 layout_type,
                 pane_count,
-            } => Ok(LayoutMode::Dynamic {
-                layout_type: layout_type.clone(),
-                pane_count: *pane_count,
-            }),
+            } => {
+                if *pane_count == 0 {
+                    return Err("invalid saved layout: pane count must be at least 1".to_string());
+                }
+
+                Ok(LayoutMode::Dynamic {
+                    layout_type: layout_type.clone(),
+                    pane_count: *pane_count,
+                })
+            }
         }
     }
+}
+
+fn dynamic_split_operations(layout_type: &LayoutType, pane_count: usize) -> Vec<SplitOperation> {
+    if pane_count <= 1 {
+        return Vec::new();
+    }
+
+    let mut operations = Vec::with_capacity(pane_count.saturating_sub(1));
+    let mut next_index = 1;
+
+    match layout_type {
+        LayoutType::Grid => build_grid_split_operations(
+            &mut operations,
+            &mut next_index,
+            0,
+            pane_count,
+            SplitDirection::Horizontal,
+            SplitDirection::Vertical,
+        ),
+        LayoutType::MainLeft => {
+            let secondary_root = push_split(
+                &mut operations,
+                &mut next_index,
+                0,
+                SplitDirection::Horizontal,
+            );
+            build_grid_split_operations(
+                &mut operations,
+                &mut next_index,
+                secondary_root,
+                pane_count - 1,
+                SplitDirection::Horizontal,
+                SplitDirection::Vertical,
+            );
+        }
+        LayoutType::MainTop => {
+            let secondary_root = push_split(
+                &mut operations,
+                &mut next_index,
+                0,
+                SplitDirection::Vertical,
+            );
+            build_grid_split_operations(
+                &mut operations,
+                &mut next_index,
+                secondary_root,
+                pane_count - 1,
+                SplitDirection::Horizontal,
+                SplitDirection::Vertical,
+            );
+        }
+    }
+
+    operations
+}
+
+fn build_grid_split_operations(
+    operations: &mut Vec<SplitOperation>,
+    next_index: &mut usize,
+    root_index: usize,
+    pane_count: usize,
+    primary_direction: SplitDirection,
+    secondary_direction: SplitDirection,
+) {
+    if pane_count <= 1 {
+        return;
+    }
+
+    let column_count = (pane_count as f64).sqrt().ceil() as usize;
+    let mut column_sizes = vec![pane_count / column_count; column_count];
+    for size in column_sizes.iter_mut().take(pane_count % column_count) {
+        *size += 1;
+    }
+
+    let mut column_roots = vec![root_index];
+    let mut current_column = root_index;
+
+    for _ in 1..column_count {
+        current_column = push_split(operations, next_index, current_column, primary_direction);
+        column_roots.push(current_column);
+    }
+
+    for (column_root, column_size) in column_roots.into_iter().zip(column_sizes) {
+        let mut current_cell = column_root;
+        for _ in 1..column_size {
+            current_cell = push_split(operations, next_index, current_cell, secondary_direction);
+        }
+    }
+}
+
+fn push_split(
+    operations: &mut Vec<SplitOperation>,
+    next_index: &mut usize,
+    parent: usize,
+    direction: SplitDirection,
+) -> usize {
+    let new_index = *next_index;
+    *next_index += 1;
+    operations.push(SplitOperation {
+        parent,
+        new_index,
+        direction,
+    });
+    new_index
 }

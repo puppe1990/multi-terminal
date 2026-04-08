@@ -133,12 +133,66 @@ fn compute_geometry_dynamic(
 }
 
 fn compute_grid(pane_count: usize, cols: u16, rows: u16) -> Vec<PaneGeometry> {
-    // Balanced grid: calculate optimal rows and columns
+    compute_grid_in_area(0, 0, cols, rows, pane_count)
+}
+
+fn compute_main_left(pane_count: usize, cols: u16, rows: u16) -> Vec<PaneGeometry> {
+    // First pane takes ~60% on the left, rest use a balanced subgrid on the right.
+    let main_width = (cols as f64 * 0.6) as u16;
+    let right_col = main_width + 1;
+    let right_width = cols.saturating_sub(right_col);
+
+    let mut geometries = vec![PaneGeometry {
+        row: 0,
+        col: 0,
+        width: main_width,
+        height: rows,
+    }];
+
+    geometries.extend(compute_grid_in_area(
+        right_col,
+        0,
+        right_width,
+        rows,
+        pane_count - 1,
+    ));
+    geometries
+}
+
+fn compute_main_top(pane_count: usize, cols: u16, rows: u16) -> Vec<PaneGeometry> {
+    // First pane takes ~40% on top, rest use a balanced subgrid below.
+    let main_height = (rows as f64 * 0.4) as u16;
+    let bottom_row = main_height + 1;
+    let bottom_height = rows.saturating_sub(bottom_row);
+
+    let mut geometries = vec![PaneGeometry {
+        row: 0,
+        col: 0,
+        width: cols,
+        height: main_height,
+    }];
+
+    geometries.extend(compute_grid_in_area(
+        0,
+        bottom_row,
+        cols,
+        bottom_height,
+        pane_count - 1,
+    ));
+    geometries
+}
+
+fn compute_grid_in_area(
+    origin_col: u16,
+    origin_row: u16,
+    cols: u16,
+    rows: u16,
+    pane_count: usize,
+) -> Vec<PaneGeometry> {
     let num_cols = (pane_count as f64).sqrt().ceil() as u16;
     let num_rows = (pane_count as u16).div_ceil(num_cols);
-
-    let cell_width = (cols - (num_cols - 1)) / num_cols;
-    let cell_height = (rows - (num_rows - 1)) / num_rows;
+    let cell_width = (cols.saturating_sub(num_cols.saturating_sub(1))) / num_cols.max(1);
+    let cell_height = (rows.saturating_sub(num_rows.saturating_sub(1))) / num_rows.max(1);
 
     let mut geometries = Vec::with_capacity(pane_count);
     let mut count = 0;
@@ -149,75 +203,14 @@ fn compute_grid(pane_count: usize, cols: u16, rows: u16) -> Vec<PaneGeometry> {
                 break;
             }
 
-            let r = row * (cell_height + 1);
-            let c = col * (cell_width + 1);
-
             geometries.push(PaneGeometry {
-                row: r,
-                col: c,
+                row: origin_row + row * (cell_height + 1),
+                col: origin_col + col * (cell_width + 1),
                 width: cell_width,
                 height: cell_height,
             });
             count += 1;
         }
-    }
-
-    geometries
-}
-
-fn compute_main_left(pane_count: usize, cols: u16, rows: u16) -> Vec<PaneGeometry> {
-    // First pane takes ~60% on the left, rest split vertically on the right
-    let main_width = (cols as f64 * 0.6) as u16;
-    let right_col = main_width + 1;
-    let right_width = cols.saturating_sub(right_col);
-
-    let remaining_panes = pane_count - 1;
-    let cell_height = (rows - (remaining_panes as u16 - 1)) / remaining_panes as u16;
-
-    let mut geometries = vec![PaneGeometry {
-        row: 0,
-        col: 0,
-        width: main_width,
-        height: rows,
-    }];
-
-    for i in 0..remaining_panes {
-        let r = (i as u16) * (cell_height + 1);
-        geometries.push(PaneGeometry {
-            row: r,
-            col: right_col,
-            width: right_width,
-            height: cell_height,
-        });
-    }
-
-    geometries
-}
-
-fn compute_main_top(pane_count: usize, cols: u16, rows: u16) -> Vec<PaneGeometry> {
-    // First pane takes ~40% on top, rest split horizontally below
-    let main_height = (rows as f64 * 0.4) as u16;
-    let bottom_row = main_height + 1;
-    let bottom_height = rows.saturating_sub(bottom_row);
-
-    let remaining_panes = pane_count - 1;
-    let cell_width = (cols - (remaining_panes as u16 - 1)) / remaining_panes as u16;
-
-    let mut geometries = vec![PaneGeometry {
-        row: 0,
-        col: 0,
-        width: cols,
-        height: main_height,
-    }];
-
-    for i in 0..remaining_panes {
-        let c = (i as u16) * (cell_width + 1);
-        geometries.push(PaneGeometry {
-            row: bottom_row,
-            col: c,
-            width: cell_width,
-            height: bottom_height,
-        });
     }
 
     geometries
