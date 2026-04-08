@@ -14,6 +14,28 @@ pub struct RuntimeArgs {
     pub maximize: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PaneOverride {
+    pub index: usize,
+    pub value: String,
+}
+
+fn parse_pane_override(s: &str) -> Result<PaneOverride, String> {
+    let (index, value) = s
+        .split_once('=')
+        .ok_or_else(|| "expected INDEX=VALUE".to_string())?;
+    let index = index
+        .parse::<usize>()
+        .map_err(|_| format!("invalid pane index '{}'", index))?;
+    if index == 0 {
+        return Err("pane index must start at 1".to_string());
+    }
+    Ok(PaneOverride {
+        index,
+        value: value.to_string(),
+    })
+}
+
 #[derive(Parser, Debug, Clone)]
 #[command(
     name = "multi-terminal",
@@ -99,6 +121,14 @@ pub struct Args {
     /// List all saved layouts
     #[arg(long)]
     pub list_layouts: bool,
+
+    /// Override command for pane INDEX (1-based): --pane INDEX=COMMAND
+    #[arg(long = "pane", value_parser = parse_pane_override)]
+    pub pane_overrides: Vec<PaneOverride>,
+
+    /// Override title for pane INDEX (1-based): --title INDEX=TITLE
+    #[arg(long = "title", value_parser = parse_pane_override)]
+    pub title_overrides: Vec<PaneOverride>,
 }
 
 fn parse_layout(s: &str) -> Result<Layout, String> {
@@ -256,6 +286,30 @@ pub fn resolve_agents_dynamic(
     }
     if args.pane4.is_none() && args.title4.is_some() && pane_count > 3 {
         agents[3].title = args.title4.clone();
+    }
+
+    // Apply indexed pane overrides
+    for override_item in &args.pane_overrides {
+        let idx = override_item.index - 1; // Convert 1-based to 0-based
+        if idx >= pane_count {
+            return Err(format!(
+                "pane index {} is out of bounds for {} panes",
+                override_item.index, pane_count
+            ));
+        }
+        agents[idx] = AgentConfig::new(AgentType::Custom(override_item.value.clone()));
+    }
+
+    // Apply indexed title overrides
+    for override_item in &args.title_overrides {
+        let idx = override_item.index - 1; // Convert 1-based to 0-based
+        if idx >= pane_count {
+            return Err(format!(
+                "pane index {} is out of bounds for {} panes",
+                override_item.index, pane_count
+            ));
+        }
+        agents[idx].title = Some(override_item.value.clone());
     }
 
     Ok(agents)

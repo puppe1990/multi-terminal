@@ -191,3 +191,43 @@ fn resolve_runtime_args_builds_dynamic_defaults() {
     );
     assert_eq!(resolved.agents[4].effective_command().is_none(), true);
 }
+
+#[test]
+fn resolve_agents_applies_indexed_pane_override() {
+    let args = parse_args(&[
+        "multi-terminal",
+        "--layout-type",
+        "grid",
+        "--pane-count",
+        "6",
+        "--pane",
+        "5=htop",
+        "--title",
+        "5=Monitor",
+    ]);
+
+    let resolved = resolve_runtime_args(&args, None).unwrap();
+
+    assert_eq!(
+        resolved.agents[4].effective_command().unwrap().program,
+        "htop"
+    );
+    assert_eq!(resolved.agents[4].effective_title(), "Monitor");
+}
+
+#[test]
+fn resolve_runtime_args_rejects_override_out_of_bounds() {
+    let args = parse_args(&[
+        "multi-terminal",
+        "--layout-type",
+        "grid",
+        "--pane-count",
+        "3",
+        "--pane",
+        "4=lazygit",
+    ]);
+
+    let error = resolve_runtime_args(&args, None).unwrap_err();
+
+    assert!(error.contains("pane index 4 is out of bounds for 3 panes"));
+}
