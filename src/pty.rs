@@ -59,6 +59,26 @@ pub fn compute_geometry(layout: &Layout, cols: u16, rows: u16) -> Vec<PaneGeomet
     }
 }
 
+struct NullWriter;
+
+impl Write for NullWriter {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        Ok(buf.len())
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+struct TerminalGuard;
+
+impl Drop for TerminalGuard {
+    fn drop(&mut self) {
+        let _ = execute!(io::stdout(), LeaveAlternateScreen, cursor::Show);
+        let _ = terminal::disable_raw_mode();
+    }
+}
+
 struct Pane {
     geom: PaneGeometry,
     output: Arc<Mutex<Vec<u8>>>,
@@ -97,11 +117,6 @@ pub fn run(layout: &Layout) -> Result<(), String> {
             if let Err(e) = child_result {
                 eprintln!("Aviso: não foi possível iniciar '{}': {}", cmd.program, e);
                 // Pane fica vazio com NullWriter
-                struct NullWriter;
-                impl Write for NullWriter {
-                    fn write(&mut self, buf: &[u8]) -> io::Result<usize> { Ok(buf.len()) }
-                    fn flush(&mut self) -> io::Result<()> { Ok(()) }
-                }
                 panes.push(Pane { geom: geom.clone(), output, writer: Box::new(NullWriter) });
                 continue;
             }
@@ -138,11 +153,6 @@ pub fn run(layout: &Layout) -> Result<(), String> {
             panes.push(Pane { geom: geom.clone(), output, writer });
         } else {
             // Pane livre: writer descarta tudo
-            struct NullWriter;
-            impl Write for NullWriter {
-                fn write(&mut self, buf: &[u8]) -> io::Result<usize> { Ok(buf.len()) }
-                fn flush(&mut self) -> io::Result<()> { Ok(()) }
-            }
             panes.push(Pane { geom: geom.clone(), output, writer: Box::new(NullWriter) });
         }
     }
@@ -151,6 +161,7 @@ pub fn run(layout: &Layout) -> Result<(), String> {
     terminal::enable_raw_mode().map_err(|e| e.to_string())?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, cursor::Hide).map_err(|e| e.to_string())?;
+    let _guard = TerminalGuard;
 
     let mut focused: usize = 0;
     let mut last_outputs: Vec<Vec<u8>> = vec![Vec::new(); panes.len()];
@@ -190,10 +201,6 @@ pub fn run(layout: &Layout) -> Result<(), String> {
             }
         }
     }
-
-    // Restaura terminal
-    execute!(stdout, LeaveAlternateScreen, cursor::Show).map_err(|e| e.to_string())?;
-    terminal::disable_raw_mode().map_err(|e| e.to_string())?;
 
     Ok(())
 }
