@@ -1,5 +1,6 @@
 use multi_terminal::layout::{AgentConfig, LayoutMode};
 use multi_terminal::tmux::build_commands;
+use std::fs;
 
 fn default_agents() -> Vec<AgentConfig> {
     LayoutMode::LegacyB.default_agents()
@@ -25,4 +26,13 @@ fn session_name_appears_in_all_commands() {
     for cmd in &cmds {
         assert!(cmd.contains(session), "comando sem session name: {}", cmd);
     }
+}
+
+#[test]
+fn install_script_forces_reinstall_of_global_binary() {
+    let script = fs::read_to_string("install").expect("deve ler script install");
+    assert!(
+        script.contains("cargo install --path . --force"),
+        "script install deve forcar reinstalacao do binario global"
+    );
 }

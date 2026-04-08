@@ -70,7 +70,8 @@ fn build_commands_supports_dynamic_grid_layout() {
         cmds.iter().filter(|cmd| cmd.contains("send-keys")).count(),
         4
     );
-    assert!(cmds.iter().any(|cmd| cmd.contains("opencode --yolo")));
+    assert!(cmds.iter().any(|cmd| cmd.contains("opencode")));
+    assert!(!cmds.iter().any(|cmd| cmd.contains("opencode --yolo")));
 }
 
 #[test]

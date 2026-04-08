@@ -39,7 +39,7 @@ impl AgentType {
             AgentType::Claude => Some(Command::new("claude", &["--dangerously-skip-permissions"])),
             AgentType::Codex => Some(Command::new("codex", &["--yolo"])),
             AgentType::Qwen => Some(Command::new("qwen", &["--yolo"])),
-            AgentType::OpenCode => Some(Command::new("opencode", &["--yolo"])),
+            AgentType::OpenCode => Some(Command::new("opencode", &[])),
             AgentType::Shell => None,
             AgentType::Custom(cmd) => Some(Command::new(cmd, &[])),
         }

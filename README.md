@@ -18,7 +18,7 @@ CLI em Rust para abrir múltiplos panes de terminal com agentes de IA e comandos
   - pane 2: `claude --dangerously-skip-permissions`
   - pane 3: `codex --yolo`
   - pane 4: `qwen --yolo`
-  - pane 5: `opencode --yolo`
+  - pane 5: `opencode`
   - pane 6+: shell livre
 - Permite sobrescrever comando e título por índice
 - Permite persistir defaults globais via CLI com `--set-default`
@@ -55,7 +55,7 @@ cargo run -- --layout-type grid --panes 6
 ### Instalação global
 
 ```bash
-cargo install --path .
+cargo install --path . --force
 ```
 
 Depois:
@@ -70,6 +70,9 @@ Atalho local do repositório:
 ```bash
 ./install
 ```
+
+Se o binário global estiver desatualizado no `PATH`, reinstale com `cargo install --path . --force`.
+Um sintoma típico é `multi-terminal --help` mostrar apenas `--layout` e não listar `--layout-type`.
 
 ## Uso básico
 
@@ -129,7 +132,7 @@ multi-terminal \
   --panes 5 \
   --pane 2="npm run dev" \
   --title 2=App \
-  --pane 5="opencode --yolo" \
+  --pane 5="opencode" \
   --title 5=OpenCode
 ```
 
