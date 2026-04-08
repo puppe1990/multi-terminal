@@ -10,24 +10,14 @@ pub fn build_applescript(layout: &Layout, cwd: &str) -> Result<String, String> {
     let mut lines = vec![
         r#"tell application "Terminal""#.to_string(),
         "  activate".to_string(),
-        format!(
-            "  do script \"{}\"",
-            apple_escape(&cd_command(cwd))
-        ),
+        format!("  do script \"{}\"", apple_escape(&tab_command(cwd, None))),
     ];
 
     for tab in tabs.iter().skip(1) {
         lines.push(format!(
             "  do script \"{}\" in front window",
-            apple_escape(&cd_command(cwd))
+            apple_escape(&tab_command(cwd, tab.command.as_deref()))
         ));
-
-        if let Some(command) = &tab.command {
-            lines.push(format!(
-                "  do script \"{}\" in selected tab of front window",
-                apple_escape(command)
-            ));
-        }
     }
 
     lines.push(r#"end tell"#.to_string());
@@ -69,6 +59,13 @@ fn terminal_app_candidates() -> Vec<String> {
 
 fn cd_command(cwd: &str) -> String {
     format!("cd '{}'", cwd.replace('\'', r"'\''"))
+}
+
+fn tab_command(cwd: &str, command: Option<&str>) -> String {
+    match command {
+        Some(command) => format!("{}; {}", cd_command(cwd), command),
+        None => cd_command(cwd),
+    }
 }
 
 fn apple_escape(value: &str) -> String {

@@ -24,38 +24,52 @@ pub fn build_applescript(layout: &Layout, cwd: &str) -> Result<String, String> {
         return Err("diretorio atual vazio".to_string());
     }
 
-    let tabs = build_tab_specs(layout);
+    let panes = build_tab_specs(layout);
     let mut lines = vec![
         r#"tell application "iTerm2""#.to_string(),
         "  activate".to_string(),
         "  create window with default profile".to_string(),
+        "  tell current window".to_string(),
+        "    set pane0 to current session".to_string(),
     ];
 
-    for (index, tab) in tabs.iter().enumerate() {
-        if index == 0 {
-            lines.push("  tell current session of current window".to_string());
-        } else {
-            lines.push("  tell current window".to_string());
-            lines.push("    create tab with default profile".to_string());
-            lines.push("  end tell".to_string());
-            lines.push("  tell current session of current window".to_string());
+    match layout {
+        Layout::B => {
+            lines.push("    set pane1 to (split horizontally with default profile)".to_string());
+            lines.push("    tell pane0".to_string());
+            lines.push("      set pane2 to (split vertically with default profile)".to_string());
+            lines.push("    end tell".to_string());
+            lines.push("    tell pane1".to_string());
+            lines.push("      set pane3 to (split vertically with default profile)".to_string());
+            lines.push("    end tell".to_string());
         }
+        Layout::A => {
+            lines.push("    set pane1 to (split horizontally with default profile)".to_string());
+            lines.push("    tell pane1".to_string());
+            lines.push("      set pane2 to (split vertically with default profile)".to_string());
+            lines.push("    end tell".to_string());
+            lines.push("    tell pane2".to_string());
+            lines.push("      set pane3 to (split horizontally with default profile)".to_string());
+            lines.push("    end tell".to_string());
+        }
+    }
 
+    for (index, pane) in panes.iter().enumerate() {
+        lines.push(format!("    tell pane{}", index));
         lines.push(format!(
-            "    write text \"{}\"",
+            "      write text \"{}\"",
             apple_escape(&cd_command(cwd))
         ));
-
-        if let Some(command) = &tab.command {
+        if let Some(command) = &pane.command {
             lines.push(format!(
-                "    write text \"{}\"",
+                "      write text \"{}\"",
                 apple_escape(command)
             ));
         }
-
-        lines.push("  end tell".to_string());
+        lines.push("    end tell".to_string());
     }
 
+    lines.push("  end tell".to_string());
     lines.push(r#"end tell"#.to_string());
     Ok(lines.join("\n"))
 }

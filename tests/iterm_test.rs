@@ -31,12 +31,34 @@ fn applescript_uses_working_directory_for_every_tab() {
 }
 
 #[test]
-fn applescript_sends_agent_commands_to_tabs() {
+fn applescript_sends_agent_commands_to_splits() {
     let script = build_applescript(&Layout::B, "/tmp/my-project").unwrap();
 
     assert!(script.contains("claude --dangerously-skip-permissions"));
     assert!(script.contains("codex --yolo"));
     assert!(script.contains("qwen --yolo"));
+    assert!(script.contains("split horizontally with default profile"));
+    assert!(script.contains("split vertically with default profile"));
+    assert!(!script.contains("create tab with default profile"));
+}
+
+#[test]
+fn layout_b_applescript_creates_three_splits_for_four_panes() {
+    let script = build_applescript(&Layout::B, "/tmp/my-project").unwrap();
+
+    assert_eq!(
+        script.matches("split ").count(),
+        3,
+        "script should create exactly three splits: {script}"
+    );
+}
+
+#[test]
+fn layout_a_applescript_uses_mixed_split_directions() {
+    let script = build_applescript(&Layout::A, "/tmp/my-project").unwrap();
+
+    assert!(script.contains("split horizontally with default profile"));
+    assert!(script.contains("split vertically with default profile"));
 }
 
 #[test]

@@ -42,18 +42,7 @@ pub fn run(args: Args) {
 
     if crate::iterm::is_supported() {
         if let Err(e) = crate::iterm::run(&args.layout) {
-            eprintln!("Erro no modo iTerm2: {}. Tentando outros backends...", e);
-        } else {
-            return;
-        }
-    }
-
-    if crate::terminal_app::is_supported() {
-        if let Err(e) = crate::terminal_app::run(&args.layout) {
-            eprintln!(
-                "Erro no modo Terminal.app: {}. Tentando tmux/PTY...",
-                e
-            );
+            eprintln!("Erro no modo iTerm2: {}. Tentando tmux/PTY...", e);
         } else {
             return;
         }

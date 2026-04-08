@@ -14,7 +14,14 @@ fn terminal_app_script_runs_agent_commands_in_tabs() {
     let script = build_applescript(&Layout::B, "/tmp/my-project").unwrap();
 
     assert!(script.contains("do script \"cd '/tmp/my-project'\""));
-    assert!(script.contains("claude --dangerously-skip-permissions"));
-    assert!(script.contains("codex --yolo"));
-    assert!(script.contains("qwen --yolo"));
+    assert!(script.contains(
+        "do script \"cd '/tmp/my-project'; claude --dangerously-skip-permissions\" in front window"
+    ));
+    assert!(script.contains(
+        "do script \"cd '/tmp/my-project'; codex --yolo\" in front window"
+    ));
+    assert!(script.contains(
+        "do script \"cd '/tmp/my-project'; qwen --yolo\" in front window"
+    ));
+    assert!(!script.contains("selected tab of front window"));
 }
