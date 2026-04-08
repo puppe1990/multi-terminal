@@ -47,7 +47,7 @@ pub struct Args {
     #[arg(long, value_parser = parse_layout_type, conflicts_with = "layout")]
     pub layout_type: Option<LayoutType>,
 
-    /// Number of panes for dynamic layouts (default: 4)
+    /// Number of panes for dynamic layouts (default: 5)
     #[arg(long = "panes", alias = "pane-count", requires = "layout_type")]
     pub pane_count: Option<usize>,
 
@@ -351,15 +351,22 @@ pub fn resolve_runtime_args_with_defaults(
 
             // Determine layout mode from CLI args
             let layout_mode = if let Some(layout_type) = &args.layout_type {
-                let pane_count = args.pane_count.unwrap_or(4).max(1);
+                let pane_count = args.pane_count.unwrap_or(5).max(1);
                 LayoutMode::Dynamic {
                     layout_type: layout_type.clone(),
                     pane_count,
                 }
-            } else {
-                match args.layout.clone().unwrap_or(Layout::B) {
+            } else if let Some(layout) = &args.layout {
+                // Legacy --layout flag still supported
+                match layout.clone() {
                     Layout::A => LayoutMode::LegacyA,
                     Layout::B => LayoutMode::LegacyB,
+                }
+            } else {
+                // Default: main-left with 5 panes
+                LayoutMode::Dynamic {
+                    layout_type: LayoutType::MainLeft,
+                    pane_count: 5,
                 }
             };
 

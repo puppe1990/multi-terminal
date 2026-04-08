@@ -8,6 +8,7 @@ CLI em Rust para abrir múltiplos panes de terminal com agentes de IA e comandos
 
 ## O que faz
 
+- Layout padrão: `main-left` com 5 panes
 - Suporta layouts dinâmicos:
   - `grid`
   - `main-left`

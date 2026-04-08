@@ -55,9 +55,15 @@ fn layout_a_pane0_is_free() {
 }
 
 #[test]
-fn default_layout_is_b() {
+fn default_layout_is_main_left_with_5_panes() {
     let resolved = resolve_runtime_args(&parse_args(&["multi-terminal"]), None).unwrap();
-    assert_eq!(resolved.layout_mode, LayoutMode::LegacyB);
+    assert_eq!(
+        resolved.layout_mode,
+        LayoutMode::Dynamic {
+            layout_type: LayoutType::MainLeft,
+            pane_count: 5,
+        }
+    );
 }
 
 #[test]
