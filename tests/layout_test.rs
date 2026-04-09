@@ -55,14 +55,33 @@ fn layout_a_pane0_is_free() {
 }
 
 #[test]
-fn default_layout_is_main_left_with_5_panes() {
+fn default_layout_is_grid_with_6_panes_and_two_free_top_panes() {
     let resolved = resolve_runtime_args(&parse_args(&["multi-terminal"]), None).unwrap();
     assert_eq!(
         resolved.layout_mode,
         LayoutMode::Dynamic {
-            layout_type: LayoutType::MainLeft,
-            pane_count: 5,
+            layout_type: LayoutType::Grid,
+            pane_count: 6,
         }
+    );
+    assert_eq!(resolved.agents.len(), 6);
+    assert!(resolved.agents[0].effective_command().is_none());
+    assert_eq!(
+        resolved.agents[1].effective_command().unwrap().program,
+        "claude"
+    );
+    assert_eq!(
+        resolved.agents[2].effective_command().unwrap().program,
+        "codex"
+    );
+    assert!(resolved.agents[3].effective_command().is_none());
+    assert_eq!(
+        resolved.agents[4].effective_command().unwrap().program,
+        "qwen"
+    );
+    assert_eq!(
+        resolved.agents[5].effective_command().unwrap().program,
+        "opencode"
     );
 }
 

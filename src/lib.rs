@@ -156,6 +156,23 @@ pub fn parse_args(args: &[&str]) -> Args {
     Args::parse_from(args)
 }
 
+fn hardcoded_startup_default() -> (LayoutMode, Vec<AgentConfig>) {
+    (
+        LayoutMode::Dynamic {
+            layout_type: LayoutType::Grid,
+            pane_count: 6,
+        },
+        vec![
+            AgentConfig::new(AgentType::Shell),
+            AgentConfig::new(AgentType::Claude),
+            AgentConfig::new(AgentType::Codex),
+            AgentConfig::new(AgentType::Shell),
+            AgentConfig::new(AgentType::Qwen),
+            AgentConfig::new(AgentType::OpenCode),
+        ],
+    )
+}
+
 pub fn resolve_agents(
     args: &Args,
     base_agents: Option<Vec<AgentConfig>>,
@@ -350,27 +367,30 @@ pub fn resolve_runtime_args_with_defaults(
             let maximize = resolve_maximize(args, None);
 
             // Determine layout mode from CLI args
-            let layout_mode = if let Some(layout_type) = &args.layout_type {
+            let (layout_mode, base_agents) = if let Some(layout_type) = &args.layout_type {
                 let pane_count = args.pane_count.unwrap_or(5).max(1);
-                LayoutMode::Dynamic {
-                    layout_type: layout_type.clone(),
-                    pane_count,
-                }
+                (
+                    LayoutMode::Dynamic {
+                        layout_type: layout_type.clone(),
+                        pane_count,
+                    },
+                    None,
+                )
             } else if let Some(layout) = &args.layout {
                 // Legacy --layout flag still supported
-                match layout.clone() {
-                    Layout::A => LayoutMode::LegacyA,
-                    Layout::B => LayoutMode::LegacyB,
-                }
+                (
+                    match layout.clone() {
+                        Layout::A => LayoutMode::LegacyA,
+                        Layout::B => LayoutMode::LegacyB,
+                    },
+                    None,
+                )
             } else {
-                // Default: main-left with 5 panes
-                LayoutMode::Dynamic {
-                    layout_type: LayoutType::MainLeft,
-                    pane_count: 5,
-                }
+                let (layout_mode, agents) = hardcoded_startup_default();
+                (layout_mode, Some(agents))
             };
 
-            (layout_mode, None, maximize)
+            (layout_mode, base_agents, maximize)
         }
     };
 

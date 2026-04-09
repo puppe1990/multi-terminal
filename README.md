@@ -8,7 +8,7 @@ CLI em Rust para abrir múltiplos panes de terminal com agentes de IA e comandos
 
 ## O que faz
 
-- Layout padrão: `main-left` com 5 panes
+- Layout padrão: `grid` com 6 panes
 - Suporta layouts dinâmicos:
   - `grid`
   - `main-left`
@@ -18,9 +18,10 @@ CLI em Rust para abrir múltiplos panes de terminal com agentes de IA e comandos
   - pane 1: shell livre
   - pane 2: `claude --dangerously-skip-permissions`
   - pane 3: `codex --yolo`
-  - pane 4: `qwen --yolo`
-  - pane 5: `opencode`
-  - pane 6+: shell livre
+  - pane 4: shell livre
+  - pane 5: `qwen --yolo`
+  - pane 6: `opencode`
+  - pane 7+: shell livre
 - Permite sobrescrever comando e título por índice
 - Permite persistir defaults globais via CLI com `--set-default`
 - Permite salvar layouts nomeados e recarregá-los depois
@@ -120,7 +121,7 @@ multi-terminal --no-codex --no-qwen
 multi-terminal --no-opencode
 ```
 
-Essas flags continuam afetando apenas os panes padrão iniciais. `--no-opencode` desabilita o pane 5 padrão quando ele existir.
+Essas flags continuam afetando apenas os panes padrão iniciais. `--no-opencode` desabilita o pane 6 padrão quando ele existir.
 
 ### Persistir defaults globais
 
