@@ -436,6 +436,25 @@ fn saved_layout_from_runtime(runtime: &RuntimeArgs) -> SavedLayout {
     }
 }
 
+pub fn validate_fallback_terminal_size(cols: u16, rows: u16) -> Result<(), String> {
+    if cols < 80 || rows < 24 {
+        Err(format!(
+            "terminal too small ({}x{}). Minimum: 80x24.",
+            cols, rows
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+fn ensure_fallback_terminal_size() {
+    let (cols, rows) = crossterm::terminal::size().unwrap_or((80, 24));
+    if let Err(e) = validate_fallback_terminal_size(cols, rows) {
+        eprintln!("Error: {e}");
+        std::process::exit(1);
+    }
+}
+
 pub fn run(args: Args) {
     // Handle --list-layouts
     if args.list_layouts {
@@ -534,15 +553,6 @@ pub fn run(args: Args) {
         return;
     }
 
-    let (cols, rows) = crossterm::terminal::size().unwrap_or((80, 24));
-    if cols < 80 || rows < 24 {
-        eprintln!(
-            "Error: terminal too small ({}x{}). Minimum: 80x24.",
-            cols, rows
-        );
-        std::process::exit(1);
-    }
-
     if crate::iterm::is_supported() {
         if let Err(e) = crate::iterm::run(&runtime.layout_mode, &runtime.agents, runtime.maximize) {
             eprintln!("Error in iTerm2 mode: {}. Trying tmux/PTY...", e);
@@ -563,6 +573,8 @@ pub fn run(args: Args) {
             return;
         }
     }
+
+    ensure_fallback_terminal_size();
 
     match which::which("tmux") {
         Ok(_) => {

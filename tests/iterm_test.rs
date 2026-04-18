@@ -38,7 +38,7 @@ fn applescript_uses_working_directory_for_every_tab() {
     )
     .unwrap();
 
-    assert!(script.starts_with("tell application \"Finder\""));
+    assert!(script.contains("tell application \"Finder\""));
     assert!(script.contains("tell application \"iTerm\""));
     assert!(script.contains("cd '/tmp/my-project'"));
     assert!(script.matches("cd '/tmp/my-project'").count() >= 4);
@@ -107,6 +107,41 @@ fn applescript_resizes_window_to_screen_bounds_when_maximized() {
     assert!(script.contains("tell application \"Finder\""));
     assert!(script.contains("set screenBounds to bounds of window of desktop"));
     assert!(script.contains("set bounds to screenBounds"));
+}
+
+#[test]
+fn applescript_prefers_frontmost_window_bounds_when_maximized() {
+    let script = build_applescript(
+        &LayoutMode::LegacyB,
+        &default_agents(),
+        true,
+        "/tmp/my-project",
+    )
+    .unwrap();
+
+    assert!(script.contains("set callerBounds to missing value"));
+    assert!(script.contains("first application process whose frontmost is true"));
+    assert!(script.contains("set callerScreenBounds to my screenBoundsForBounds(callerBounds)"));
+    assert!(script.contains("set screenBounds to callerScreenBounds"));
+    assert!(!script.contains("set screenBounds to callerBounds"));
+}
+
+#[test]
+fn applescript_maps_frontmost_window_to_its_screen_bounds() {
+    let script = build_applescript(
+        &LayoutMode::LegacyB,
+        &default_agents(),
+        true,
+        "/tmp/my-project",
+    )
+    .unwrap();
+
+    assert!(script.starts_with("use framework \"AppKit\""));
+    assert!(script.contains("set screenList to current application's NSScreen's screens()"));
+    assert!(script.contains("set appKitCenterY to mainHeight - centerY"));
+    assert!(script.contains(
+        "return {minX as integer, topY as integer, maxX as integer, bottomY as integer}"
+    ));
 }
 
 #[test]

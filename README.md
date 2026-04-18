@@ -31,12 +31,13 @@ CLI em Rust para abrir múltiplos panes de terminal com agentes de IA e comandos
 
 - No macOS:
   - usa `iTerm2` quando disponível
+  - ao maximizar, tenta abrir a nova janela na mesma tela da janela de terminal que chamou o comando
   - tenta instalar `iTerm2` automaticamente via Homebrew quando não estiver instalado
 - Fora disso, ou se o fluxo do `iTerm2` falhar:
   - usa `tmux` quando disponível
   - cai para um fallback TUI em Rust com `portable-pty` + `crossterm`
 
-O terminal precisa ter no mínimo `80x24`.
+O terminal precisa ter no mínimo `80x24` apenas quando a execução cair para `tmux` ou para o TUI fallback.
 
 ## Instalação
 

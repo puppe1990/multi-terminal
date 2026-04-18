@@ -1,5 +1,6 @@
 use multi_terminal::layout::{AgentConfig, LayoutMode};
 use multi_terminal::tmux::build_commands;
+use multi_terminal::validate_fallback_terminal_size;
 use std::fs;
 
 fn default_agents() -> Vec<AgentConfig> {
@@ -35,4 +36,16 @@ fn install_script_forces_reinstall_of_global_binary() {
         script.contains("cargo install --path . --force"),
         "script install deve forcar reinstalacao do binario global"
     );
+}
+
+#[test]
+fn fallback_terminal_size_accepts_minimum_supported_size() {
+    assert!(validate_fallback_terminal_size(80, 24).is_ok());
+}
+
+#[test]
+fn fallback_terminal_size_rejects_short_terminal() {
+    let error = validate_fallback_terminal_size(118, 18).unwrap_err();
+
+    assert_eq!(error, "terminal too small (118x18). Minimum: 80x24.");
 }
