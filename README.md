@@ -74,6 +74,16 @@ Atalho local do repositório:
 ./install
 ```
 
+O script `./install` também tenta criar o atalho `mt` em `~/.cargo/bin/mt`, apontando para `multi-terminal`.
+Se esse caminho já estiver ocupado por outro comando, o script preserva o comando existente e mantém apenas `multi-terminal`.
+
+Depois:
+
+```bash
+mt
+mt --layout-type main-top --panes 7
+```
+
 Se o binário global estiver desatualizado no `PATH`, reinstale com `cargo install --path . --force`.
 Um sintoma típico é `multi-terminal --help` mostrar apenas `--layout` e não listar `--layout-type`.
 

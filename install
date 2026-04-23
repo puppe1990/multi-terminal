@@ -2,3 +2,26 @@
 set -eu
 
 cargo install --path . --force
+
+cargo_bin_dir="${CARGO_HOME:-$HOME/.cargo}/bin"
+multi_terminal_bin="$cargo_bin_dir/multi-terminal"
+mt_bin="$cargo_bin_dir/mt"
+
+if [ ! -x "$multi_terminal_bin" ]; then
+  echo "erro: binario instalado nao encontrado em $multi_terminal_bin" >&2
+  exit 1
+fi
+
+if [ -e "$mt_bin" ]; then
+  if [ -L "$mt_bin" ] && [ "$(readlink "$mt_bin")" = "$multi_terminal_bin" ]; then
+    echo "atalho mt ja aponta para $multi_terminal_bin"
+    exit 0
+  fi
+
+  echo "atalho mt nao foi criado porque $mt_bin ja existe"
+  echo "use 'multi-terminal' ou libere esse caminho e rode ./install novamente"
+  exit 0
+fi
+
+ln -s "$multi_terminal_bin" "$mt_bin"
+echo "atalho criado: mt -> $multi_terminal_bin"

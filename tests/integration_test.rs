@@ -39,6 +39,24 @@ fn install_script_forces_reinstall_of_global_binary() {
 }
 
 #[test]
+fn install_script_creates_mt_shortcut_without_overwriting_existing_command() {
+    let script = fs::read_to_string("install").expect("deve ler script install");
+
+    assert!(
+        script.contains("mt_bin=\"$cargo_bin_dir/mt\""),
+        "script install deve preparar o atalho mt"
+    );
+    assert!(
+        script.contains("ln -s \"$multi_terminal_bin\" \"$mt_bin\""),
+        "script install deve criar link simbolico para mt"
+    );
+    assert!(
+        script.contains("atalho mt nao foi criado porque $mt_bin ja existe"),
+        "script install deve preservar um comando mt existente"
+    );
+}
+
+#[test]
 fn fallback_terminal_size_accepts_minimum_supported_size() {
     assert!(validate_fallback_terminal_size(80, 24).is_ok());
 }
