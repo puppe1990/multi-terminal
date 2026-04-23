@@ -28,10 +28,10 @@ fn layout_b_sends_codex_command() {
 }
 
 #[test]
-fn layout_b_sends_qwen_command() {
+fn layout_b_sends_cursor_command() {
     let cmds = build_commands(&LayoutMode::LegacyB, &default_agents(), "multi");
-    let has_qwen = cmds.iter().any(|c| c.contains("qwen --yolo"));
-    assert!(has_qwen);
+    let has_cursor = cmds.iter().any(|c| c.contains("agent"));
+    assert!(has_cursor);
 }
 
 #[test]

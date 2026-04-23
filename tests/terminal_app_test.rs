@@ -24,6 +24,6 @@ fn terminal_app_script_runs_agent_commands_in_tabs() {
         "do script \"cd '/tmp/my-project'; claude --dangerously-skip-permissions\" in front window"
     ));
     assert!(script.contains("do script \"cd '/tmp/my-project'; codex --yolo\" in front window"));
-    assert!(script.contains("do script \"cd '/tmp/my-project'; qwen --yolo\" in front window"));
+    assert!(script.contains("do script \"cd '/tmp/my-project'; agent\" in front window"));
     assert!(!script.contains("selected tab of front window"));
 }

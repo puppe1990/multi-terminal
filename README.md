@@ -19,7 +19,7 @@ CLI em Rust para abrir múltiplos panes de terminal com agentes de IA e comandos
   - pane 2: `claude --dangerously-skip-permissions`
   - pane 3: `codex --yolo`
   - pane 4: shell livre
-  - pane 5: `qwen --yolo`
+  - pane 5: `agent`
   - pane 6: `opencode`
   - pane 7+: shell livre
 - Permite sobrescrever comando e título por índice
@@ -66,6 +66,7 @@ Depois:
 ```bash
 multi-terminal
 multi-terminal --layout-type main-top --panes 7
+multi-terminal ~/projetos/minha-pasta
 ```
 
 Atalho local do repositório:
@@ -82,7 +83,10 @@ Depois:
 ```bash
 mt
 mt --layout-type main-top --panes 7
+mt ~/projetos/minha-pasta
 ```
+
+Você também pode passar uma pasta como argumento posicional. O `multi-terminal` troca para esse diretório antes de abrir os panes, então todos eles começam naquela pasta.
 
 Se o binário global estiver desatualizado no `PATH`, reinstale com `cargo install --path . --force`.
 Um sintoma típico é `multi-terminal --help` mostrar apenas `--layout` e não listar `--layout-type`.
@@ -91,7 +95,9 @@ Um sintoma típico é `multi-terminal --help` mostrar apenas `--layout` e não l
 
 ```bash
 multi-terminal
+multi-terminal ~/projetos/api
 multi-terminal --layout-type grid --panes 6
+multi-terminal ~/projetos/api --layout-type grid --panes 6
 multi-terminal --layout-type main-left --panes 5 --maximize
 multi-terminal --set-default --layout-type grid --panes 5 --pane 2="npm run dev"
 ```
@@ -128,7 +134,7 @@ Se `--pane INDEX=...` for usado sem `--title INDEX=...`, o próprio comando vira
 
 ```bash
 multi-terminal --no-claude
-multi-terminal --no-codex --no-qwen
+multi-terminal --no-codex --no-cursor
 multi-terminal --no-opencode
 ```
 

@@ -27,7 +27,8 @@ impl Command {
 pub enum AgentType {
     Claude,
     Codex,
-    Qwen,
+    #[serde(rename = "Cursor", alias = "Qwen")]
+    Cursor,
     OpenCode,
     Shell,
     Custom(String),
@@ -38,7 +39,7 @@ impl AgentType {
         match self {
             AgentType::Claude => Some(Command::new("claude", &["--dangerously-skip-permissions"])),
             AgentType::Codex => Some(Command::new("codex", &["--yolo"])),
-            AgentType::Qwen => Some(Command::new("qwen", &["--yolo"])),
+            AgentType::Cursor => Some(Command::new("agent", &[])),
             AgentType::OpenCode => Some(Command::new("opencode", &[])),
             AgentType::Shell => None,
             AgentType::Custom(cmd) => Some(Command::new(cmd, &[])),
@@ -49,7 +50,7 @@ impl AgentType {
         match self {
             AgentType::Claude => "claude",
             AgentType::Codex => "codex",
-            AgentType::Qwen => "qwen",
+            AgentType::Cursor => "cursor",
             AgentType::OpenCode => "opencode",
             AgentType::Shell => "shell",
             AgentType::Custom(cmd) => cmd,
@@ -98,7 +99,7 @@ impl AgentConfig {
             .unwrap_or_else(|| match &self.agent_type {
                 AgentType::Claude => "Claude AI".to_string(),
                 AgentType::Codex => "Codex".to_string(),
-                AgentType::Qwen => "Qwen".to_string(),
+                AgentType::Cursor => "Cursor".to_string(),
                 AgentType::OpenCode => "OpenCode".to_string(),
                 AgentType::Shell => "Shell".to_string(),
                 AgentType::Custom(cmd) => cmd.clone(),
@@ -162,7 +163,7 @@ impl LayoutMode {
             agents[2] = AgentConfig::new(AgentType::Codex);
         }
         if count > 3 {
-            agents[3] = AgentConfig::new(AgentType::Qwen);
+            agents[3] = AgentConfig::new(AgentType::Cursor);
         }
         if count > 4 {
             agents[4] = AgentConfig::new(AgentType::OpenCode);
@@ -237,7 +238,7 @@ impl Layout {
             AgentConfig::new(AgentType::Shell),
             AgentConfig::new(AgentType::Claude),
             AgentConfig::new(AgentType::Codex),
-            AgentConfig::new(AgentType::Qwen),
+            AgentConfig::new(AgentType::Cursor),
         ]
     }
 

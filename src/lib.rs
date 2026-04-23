@@ -4,8 +4,9 @@ pub mod pty;
 pub mod terminal_app;
 pub mod tmux;
 
-use clap::Parser;
+use clap::{Parser, ValueHint};
 use layout::{AgentConfig, AgentType, Layout, LayoutMode, LayoutType, SavedLayout};
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone)]
 pub struct RuntimeArgs {
@@ -39,6 +40,10 @@ fn parse_pane_override(s: &str) -> Result<PaneOverride, String> {
 #[derive(Parser, Debug, Clone)]
 #[command(name = "multi-terminal", about = "Opens terminal panes with AI agents")]
 pub struct Args {
+    /// Working directory to open in every pane
+    #[arg(value_name = "PATH", value_hint = ValueHint::DirPath)]
+    pub working_dir: Option<PathBuf>,
+
     /// Pane layout: a or b (default: b)
     #[arg(long, value_parser = parse_layout, conflicts_with = "layout_type")]
     pub layout: Option<Layout>,
@@ -59,9 +64,9 @@ pub struct Args {
     #[arg(long)]
     pub no_codex: bool,
 
-    /// Disable Qwen agent
-    #[arg(long)]
-    pub no_qwen: bool,
+    /// Disable Cursor agent
+    #[arg(long, alias = "no-qwen")]
+    pub no_cursor: bool,
 
     /// Disable OpenCode agent
     #[arg(long)]
@@ -167,7 +172,7 @@ fn hardcoded_startup_default() -> (LayoutMode, Vec<AgentConfig>) {
             AgentConfig::new(AgentType::Claude),
             AgentConfig::new(AgentType::Codex),
             AgentConfig::new(AgentType::Shell),
-            AgentConfig::new(AgentType::Qwen),
+            AgentConfig::new(AgentType::Cursor),
             AgentConfig::new(AgentType::OpenCode),
         ],
     )
@@ -195,7 +200,7 @@ pub fn resolve_agents(
     if args.no_codex {
         agents[2] = AgentConfig::new(AgentType::Shell);
     }
-    if args.no_qwen {
+    if args.no_cursor {
         agents[3] = AgentConfig::new(AgentType::Shell);
     }
 
@@ -257,7 +262,7 @@ pub fn resolve_agents_dynamic(
     if pane_count > 2 && args.no_codex {
         agents[2] = AgentConfig::new(AgentType::Shell);
     }
-    if pane_count > 3 && args.no_qwen {
+    if pane_count > 3 && args.no_cursor {
         agents[3] = AgentConfig::new(AgentType::Shell);
     }
     if pane_count > 4 && args.no_opencode {
@@ -447,6 +452,33 @@ pub fn validate_fallback_terminal_size(cols: u16, rows: u16) -> Result<(), Strin
     }
 }
 
+pub fn resolve_working_dir(path: Option<&Path>) -> Result<Option<PathBuf>, String> {
+    let Some(path) = path else {
+        return Ok(None);
+    };
+
+    if !path.exists() {
+        return Err(format!(
+            "working directory '{}' does not exist",
+            path.display()
+        ));
+    }
+
+    if !path.is_dir() {
+        return Err(format!(
+            "working directory '{}' is not a directory",
+            path.display()
+        ));
+    }
+
+    std::fs::canonicalize(path).map(Some).map_err(|e| {
+        format!(
+            "failed to resolve working directory '{}': {e}",
+            path.display()
+        )
+    })
+}
+
 fn ensure_fallback_terminal_size() {
     let (cols, rows) = crossterm::terminal::size().unwrap_or((80, 24));
     if let Err(e) = validate_fallback_terminal_size(cols, rows) {
@@ -551,6 +583,25 @@ pub fn run(args: Args) {
         }
         println!("Layout '{}' saved successfully.", name);
         return;
+    }
+
+    let working_dir = match resolve_working_dir(args.working_dir.as_deref()) {
+        Ok(path) => path,
+        Err(e) => {
+            eprintln!("Error resolving working directory: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    if let Some(path) = working_dir {
+        if let Err(e) = std::env::set_current_dir(&path) {
+            eprintln!(
+                "Error changing working directory to '{}': {}",
+                path.display(),
+                e
+            );
+            std::process::exit(1);
+        }
     }
 
     if crate::iterm::is_supported() {

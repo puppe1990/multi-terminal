@@ -1,6 +1,7 @@
 use clap::Parser;
 use multi_terminal::layout::{AgentConfig, AgentType, Layout, LayoutMode, LayoutType, SavedLayout};
-use multi_terminal::{parse_args, resolve_agents, resolve_runtime_args, Args};
+use multi_terminal::{parse_args, resolve_agents, resolve_runtime_args, resolve_working_dir, Args};
+use std::path::Path;
 
 fn default_agents() -> Vec<AgentConfig> {
     Layout::B.default_agents()
@@ -41,11 +42,11 @@ fn layout_b_pane2_runs_codex() {
 }
 
 #[test]
-fn layout_b_pane3_runs_qwen() {
+fn layout_b_pane3_runs_cursor() {
     let panes = Layout::B.panes(&default_agents());
     let cmd = panes[3].effective_command().unwrap();
-    assert_eq!(cmd.program, "qwen");
-    assert_eq!(cmd.args, vec!["--yolo"]);
+    assert_eq!(cmd.program, "agent");
+    assert!(cmd.args.is_empty());
 }
 
 #[test]
@@ -77,7 +78,7 @@ fn default_layout_is_grid_with_6_panes_and_two_free_top_panes() {
     assert!(resolved.agents[3].effective_command().is_none());
     assert_eq!(
         resolved.agents[4].effective_command().unwrap().program,
-        "qwen"
+        "agent"
     );
     assert_eq!(
         resolved.agents[5].effective_command().unwrap().program,
@@ -108,7 +109,7 @@ fn resolve_runtime_args_uses_saved_layout_agents_when_loading() {
             AgentConfig::new(AgentType::Custom("htop".to_string())).with_title("Monitor"),
             AgentConfig::new(AgentType::Shell),
             AgentConfig::new(AgentType::Custom("npm run dev".to_string())).with_title("App"),
-            AgentConfig::new(AgentType::Qwen),
+            AgentConfig::new(AgentType::Cursor),
         ],
         maximize: true,
     };
@@ -134,7 +135,7 @@ fn resolve_runtime_args_allows_cli_overrides_on_loaded_agents() {
         "lazygit",
         "--title2",
         "Git",
-        "--no-qwen",
+        "--no-cursor",
     ]);
     let saved = SavedLayout {
         layout: multi_terminal::layout::SavedLayoutKind::Legacy("b".to_string()),
@@ -190,6 +191,22 @@ fn parse_args_supports_layout_type_and_panes() {
 
     assert_eq!(args.layout_type, Some(LayoutType::Grid));
     assert_eq!(args.pane_count, Some(6));
+}
+
+#[test]
+fn parse_args_supports_positional_working_dir() {
+    let args = parse_args(&["multi-terminal", "/tmp/demo", "--layout-type", "grid"]);
+
+    assert_eq!(args.working_dir.as_deref(), Some(Path::new("/tmp/demo")));
+    assert_eq!(args.layout_type, Some(LayoutType::Grid));
+}
+
+#[test]
+fn resolve_working_dir_rejects_missing_path() {
+    let path = std::env::temp_dir().join("multi-terminal-missing-dir-for-test");
+    let error = resolve_working_dir(Some(path.as_path())).unwrap_err();
+
+    assert!(error.contains("does not exist"));
 }
 
 #[test]
@@ -288,7 +305,7 @@ fn resolve_runtime_args_uses_saved_dynamic_layout() {
             AgentConfig::new(AgentType::Shell),
             AgentConfig::new(AgentType::Claude),
             AgentConfig::new(AgentType::Codex),
-            AgentConfig::new(AgentType::Qwen),
+            AgentConfig::new(AgentType::Cursor),
             AgentConfig::new(AgentType::Custom("npm test".to_string())),
         ],
         maximize: true,
@@ -318,7 +335,7 @@ fn resolve_runtime_args_uses_persisted_default_layout_when_no_cli_layout_is_prov
             AgentConfig::new(AgentType::Shell),
             AgentConfig::new(AgentType::Claude),
             AgentConfig::new(AgentType::Custom("npm run dev".to_string())).with_title("App"),
-            AgentConfig::new(AgentType::Qwen),
+            AgentConfig::new(AgentType::Cursor),
             AgentConfig::new(AgentType::OpenCode),
         ],
         maximize: false,
@@ -356,7 +373,7 @@ fn cli_layout_overrides_persisted_default_layout() {
             AgentConfig::new(AgentType::Shell),
             AgentConfig::new(AgentType::Claude),
             AgentConfig::new(AgentType::Codex),
-            AgentConfig::new(AgentType::Qwen),
+            AgentConfig::new(AgentType::Cursor),
             AgentConfig::new(AgentType::OpenCode),
         ],
         maximize: false,
@@ -392,7 +409,7 @@ fn loaded_layout_still_overrides_persisted_defaults() {
             AgentConfig::new(AgentType::Shell),
             AgentConfig::new(AgentType::Claude),
             AgentConfig::new(AgentType::Codex),
-            AgentConfig::new(AgentType::Qwen),
+            AgentConfig::new(AgentType::Cursor),
             AgentConfig::new(AgentType::OpenCode),
         ],
         maximize: false,

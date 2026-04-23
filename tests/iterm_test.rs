@@ -25,7 +25,7 @@ fn build_tab_specs_autoruns_agents_in_remaining_tabs() {
         Some("claude --dangerously-skip-permissions")
     );
     assert_eq!(tabs[2].command.as_deref(), Some("codex --yolo"));
-    assert_eq!(tabs[3].command.as_deref(), Some("qwen --yolo"));
+    assert_eq!(tabs[3].command.as_deref(), Some("agent"));
 }
 
 #[test]
@@ -56,7 +56,7 @@ fn applescript_sends_agent_commands_to_splits() {
 
     assert!(script.contains("claude --dangerously-skip-permissions"));
     assert!(script.contains("codex --yolo"));
-    assert!(script.contains("qwen --yolo"));
+    assert!(script.contains("agent"));
     assert!(script.contains("set pane0 to current session"));
     assert!(script.contains("split horizontally with default profile"));
     assert!(script.contains("split vertically with default profile"));
