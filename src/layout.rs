@@ -157,16 +157,17 @@ impl LayoutMode {
 
         // Assign default agents based on position
         if count > 1 {
-            agents[1] = AgentConfig::new(AgentType::Claude);
+            agents[1] = AgentConfig::new(AgentType::Codex);
         }
         if count > 2 {
-            agents[2] = AgentConfig::new(AgentType::Codex);
+            agents[2] = AgentConfig::new(AgentType::Custom("kimi".to_string()))
+                .with_command(Command::new("kimi", &["--yolo"]));
         }
         if count > 3 {
-            agents[3] = AgentConfig::new(AgentType::Cursor);
+            agents[3] = AgentConfig::new(AgentType::OpenCode);
         }
         if count > 4 {
-            agents[4] = AgentConfig::new(AgentType::OpenCode);
+            agents[4] = AgentConfig::new(AgentType::Custom("kilo".to_string()));
         }
 
         agents
@@ -236,9 +237,10 @@ impl Layout {
     pub fn default_agents(&self) -> Vec<AgentConfig> {
         vec![
             AgentConfig::new(AgentType::Shell),
-            AgentConfig::new(AgentType::Claude),
             AgentConfig::new(AgentType::Codex),
-            AgentConfig::new(AgentType::Cursor),
+            AgentConfig::new(AgentType::Custom("kimi".to_string()))
+                .with_command(Command::new("kimi", &["--yolo"])),
+            AgentConfig::new(AgentType::OpenCode),
         ]
     }
 
