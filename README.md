@@ -14,14 +14,13 @@ CLI em Rust para abrir múltiplos panes de terminal com agentes de IA e comandos
   - `main-left`
   - `main-top`
 - Aceita quantidade variável de panes com `--panes`
-- Inicia, por padrão:
+- Inicia, por padrão (6 panes em grid):
   - pane 1: shell livre
-  - pane 2: `claude --dangerously-skip-permissions`
-  - pane 3: `codex --yolo`
+  - pane 2: `codex --yolo`
+  - pane 3: `kimi --yolo`
   - pane 4: shell livre
-  - pane 5: `agent`
-  - pane 6: `opencode`
-  - pane 7+: shell livre
+  - pane 5: `opencode`
+  - pane 6: `kilo`
 - Permite sobrescrever comando e título por índice
 - Permite persistir defaults globais via CLI com `--set-default`
 - Permite salvar layouts nomeados e recarregá-los depois
@@ -139,12 +138,16 @@ Se `--pane INDEX=...` for usado sem `--title INDEX=...`, o próprio comando vira
 ### Desabilitar agentes padrão
 
 ```bash
-multi-terminal --no-claude
-multi-terminal --no-codex --no-cursor
+multi-terminal --no-codex
 multi-terminal --no-opencode
+multi-terminal --no-codex --no-opencode
 ```
 
-Essas flags continuam afetando apenas os panes padrão iniciais. `--no-opencode` desabilita o pane 6 padrão quando ele existir.
+Essas flags substituem o pane correspondente por shell livre:
+- `--no-codex` desabilita o pane 2
+- `--no-opencode` desabilita o pane 5
+
+As flags legadas `--no-claude` e `--no-cursor` também continuam aceitas e afetam os panes 2 e 4 respectivamente.
 
 ### Fechar o terminal atual
 
