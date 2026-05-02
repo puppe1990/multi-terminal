@@ -20,12 +20,9 @@ fn build_tab_specs_keeps_first_tab_as_shell() {
 fn build_tab_specs_autoruns_agents_in_remaining_tabs() {
     let tabs = build_tab_specs(&LayoutMode::LegacyB, &default_agents());
 
-    assert_eq!(
-        tabs[1].command.as_deref(),
-        Some("claude --dangerously-skip-permissions")
-    );
-    assert_eq!(tabs[2].command.as_deref(), Some("codex --yolo"));
-    assert_eq!(tabs[3].command.as_deref(), Some("agent"));
+    assert_eq!(tabs[1].command.as_deref(), Some("codex --yolo"));
+    assert_eq!(tabs[2].command.as_deref(), Some("kimi --yolo"));
+    assert_eq!(tabs[3].command.as_deref(), Some("opencode"));
 }
 
 #[test]
@@ -54,9 +51,9 @@ fn applescript_sends_agent_commands_to_splits() {
     )
     .unwrap();
 
-    assert!(script.contains("claude --dangerously-skip-permissions"));
     assert!(script.contains("codex --yolo"));
-    assert!(script.contains("agent"));
+    assert!(script.contains("kimi --yolo"));
+    assert!(script.contains("opencode"));
     assert!(script.contains("set pane0 to current session"));
     assert!(script.contains("split horizontally with default profile"));
     assert!(script.contains("split vertically with default profile"));

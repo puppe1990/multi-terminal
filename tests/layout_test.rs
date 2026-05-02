@@ -26,26 +26,26 @@ fn layout_b_pane0_has_no_command() {
 }
 
 #[test]
-fn layout_b_pane1_runs_claude() {
+fn layout_b_pane1_runs_codex() {
     let panes = Layout::B.panes(&default_agents());
     let cmd = panes[1].effective_command().unwrap();
-    assert_eq!(cmd.program, "claude");
-    assert_eq!(cmd.args, vec!["--dangerously-skip-permissions"]);
-}
-
-#[test]
-fn layout_b_pane2_runs_codex() {
-    let panes = Layout::B.panes(&default_agents());
-    let cmd = panes[2].effective_command().unwrap();
     assert_eq!(cmd.program, "codex");
     assert_eq!(cmd.args, vec!["--yolo"]);
 }
 
 #[test]
-fn layout_b_pane3_runs_cursor() {
+fn layout_b_pane2_runs_kimi() {
+    let panes = Layout::B.panes(&default_agents());
+    let cmd = panes[2].effective_command().unwrap();
+    assert_eq!(cmd.program, "kimi");
+    assert_eq!(cmd.args, vec!["--yolo"]);
+}
+
+#[test]
+fn layout_b_pane3_runs_opencode() {
     let panes = Layout::B.panes(&default_agents());
     let cmd = panes[3].effective_command().unwrap();
-    assert_eq!(cmd.program, "agent");
+    assert_eq!(cmd.program, "opencode");
     assert!(cmd.args.is_empty());
 }
 
@@ -56,7 +56,7 @@ fn layout_a_pane0_is_free() {
 }
 
 #[test]
-fn default_layout_is_grid_with_6_panes_and_two_free_top_panes() {
+fn default_layout_is_grid_with_6_panes_and_two_free_panes() {
     let resolved = resolve_runtime_args(&parse_args(&["multi-terminal"]), None).unwrap();
     assert_eq!(
         resolved.layout_mode,
@@ -69,20 +69,20 @@ fn default_layout_is_grid_with_6_panes_and_two_free_top_panes() {
     assert!(resolved.agents[0].effective_command().is_none());
     assert_eq!(
         resolved.agents[1].effective_command().unwrap().program,
-        "claude"
+        "codex"
     );
     assert_eq!(
         resolved.agents[2].effective_command().unwrap().program,
-        "codex"
+        "kimi"
     );
     assert!(resolved.agents[3].effective_command().is_none());
     assert_eq!(
         resolved.agents[4].effective_command().unwrap().program,
-        "agent"
+        "opencode"
     );
     assert_eq!(
         resolved.agents[5].effective_command().unwrap().program,
-        "opencode"
+        "kilo"
     );
 }
 
@@ -232,25 +232,25 @@ fn resolve_runtime_args_builds_dynamic_defaults() {
     assert!(resolved.agents[0].effective_command().is_none());
     assert_eq!(
         resolved.agents[1].effective_command().unwrap().program,
-        "claude"
+        "codex"
     );
     assert_eq!(
         resolved.agents[4].effective_command().unwrap().program,
-        "opencode"
+        "kilo"
     );
 }
 
 #[test]
-fn dynamic_defaults_assign_opencode_to_fifth_pane() {
+fn dynamic_defaults_assign_kilo_to_fifth_pane() {
     let args = parse_args(&["multi-terminal", "--layout-type", "grid", "--panes", "5"]);
 
     let resolved = resolve_runtime_args(&args, None).unwrap();
 
     assert_eq!(
         resolved.agents[4].effective_command().unwrap().program,
-        "opencode"
+        "kilo"
     );
-    assert_eq!(resolved.agents[4].effective_title(), "OpenCode");
+    assert_eq!(resolved.agents[4].effective_title(), "kilo");
 }
 
 #[test]
@@ -445,6 +445,24 @@ fn args_parse_set_default_flag() {
     let args = parse_args(&["multi-terminal", "--set-default"]);
 
     assert!(args.set_default);
+}
+
+#[test]
+fn args_parse_close_current_flags() {
+    let primary = parse_args(&["multi-terminal", "--close-current"]);
+    let alias = parse_args(&["multi-terminal", "--cc"]);
+
+    assert!(primary.close_current);
+    assert!(alias.close_current);
+}
+
+#[test]
+fn args_parse_force_close_current_flags() {
+    let primary = parse_args(&["multi-terminal", "--force-close-current"]);
+    let alias = parse_args(&["multi-terminal", "--fcc"]);
+
+    assert!(primary.force_close_current);
+    assert!(alias.force_close_current);
 }
 
 #[test]

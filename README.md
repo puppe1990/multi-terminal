@@ -67,6 +67,8 @@ Depois:
 multi-terminal
 multi-terminal --layout-type main-top --panes 7
 multi-terminal ~/projetos/minha-pasta
+multi-terminal --close-current
+multi-terminal --force-close-current
 ```
 
 Atalho local do repositório:
@@ -84,6 +86,8 @@ Depois:
 mt
 mt --layout-type main-top --panes 7
 mt ~/projetos/minha-pasta
+mt --cc
+mt --fcc
 ```
 
 Você também pode passar uma pasta como argumento posicional. O `multi-terminal` troca para esse diretório antes de abrir os panes, então todos eles começam naquela pasta.
@@ -99,6 +103,8 @@ multi-terminal ~/projetos/api
 multi-terminal --layout-type grid --panes 6
 multi-terminal ~/projetos/api --layout-type grid --panes 6
 multi-terminal --layout-type main-left --panes 5 --maximize
+multi-terminal --close-current
+multi-terminal --force-close-current
 multi-terminal --set-default --layout-type grid --panes 5 --pane 2="npm run dev"
 ```
 
@@ -139,6 +145,22 @@ multi-terminal --no-opencode
 ```
 
 Essas flags continuam afetando apenas os panes padrão iniciais. `--no-opencode` desabilita o pane 6 padrão quando ele existir.
+
+### Fechar o terminal atual
+
+```bash
+multi-terminal --close-current
+mt --cc
+```
+
+`--cc` é alias de `--close-current`. A flag só fecha o terminal atual quando o `multi-terminal` consegue abrir a nova janela em um app separado.
+
+```bash
+multi-terminal --force-close-current
+mt --fcc
+```
+
+`--fcc` é alias de `--force-close-current`. Essa variante tenta encerrar a sessão atual sem prompt antes de fechar a janela.
 
 ### Persistir defaults globais
 

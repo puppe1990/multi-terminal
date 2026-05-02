@@ -1,3 +1,4 @@
+pub mod current_terminal;
 pub mod iterm;
 pub mod layout;
 pub mod pty;
@@ -5,7 +6,7 @@ pub mod terminal_app;
 pub mod tmux;
 
 use clap::{Parser, ValueHint};
-use layout::{AgentConfig, AgentType, Layout, LayoutMode, LayoutType, SavedLayout};
+use layout::{AgentConfig, AgentType, Command, Layout, LayoutMode, LayoutType, SavedLayout};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone)]
@@ -120,6 +121,14 @@ pub struct Args {
     #[arg(long)]
     pub set_default: bool,
 
+    /// Close the current terminal window after opening the new layout
+    #[arg(long, alias = "cc")]
+    pub close_current: bool,
+
+    /// Force close the current terminal window without confirmation
+    #[arg(long, alias = "fcc", conflicts_with = "close_current")]
+    pub force_close_current: bool,
+
     /// Load a previously saved layout by name
     #[arg(long)]
     pub load: Option<String>,
@@ -169,11 +178,12 @@ fn hardcoded_startup_default() -> (LayoutMode, Vec<AgentConfig>) {
         },
         vec![
             AgentConfig::new(AgentType::Shell),
-            AgentConfig::new(AgentType::Claude),
             AgentConfig::new(AgentType::Codex),
+            AgentConfig::new(AgentType::Custom("kimi".to_string()))
+                .with_command(Command::new("kimi", &["--yolo"])),
             AgentConfig::new(AgentType::Shell),
-            AgentConfig::new(AgentType::Cursor),
             AgentConfig::new(AgentType::OpenCode),
+            AgentConfig::new(AgentType::Custom("kilo".to_string())),
         ],
     )
 }
@@ -604,10 +614,20 @@ pub fn run(args: Args) {
         }
     }
 
+    let should_close_current = args.close_current || args.force_close_current;
+    let close_request = crate::current_terminal::capture_close_request(should_close_current)
+        .map_err(|error| eprintln!("Warning: {error}"))
+        .ok()
+        .flatten();
+
     if crate::iterm::is_supported() {
         if let Err(e) = crate::iterm::run(&runtime.layout_mode, &runtime.agents, runtime.maximize) {
             eprintln!("Error in iTerm2 mode: {}. Trying tmux/PTY...", e);
         } else {
+            crate::current_terminal::close_if_requested(
+                close_request.as_ref(),
+                args.force_close_current,
+            );
             return;
         }
     } else if cfg!(target_os = "macos") {
@@ -621,8 +641,23 @@ pub fn run(args: Args) {
                 e
             );
         } else {
+            crate::current_terminal::close_if_requested(
+                close_request.as_ref(),
+                args.force_close_current,
+            );
             return;
         }
+    }
+
+    if should_close_current {
+        eprintln!(
+            "Warning: {} requires launching a separate terminal window.",
+            if args.force_close_current {
+                "--force-close-current"
+            } else {
+                "--close-current"
+            }
+        );
     }
 
     ensure_fallback_terminal_size();

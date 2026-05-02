@@ -12,12 +12,10 @@ fn layout_b_commands_start_with_new_session() {
 }
 
 #[test]
-fn layout_b_sends_claude_command() {
+fn layout_b_sends_kimi_command() {
     let cmds = build_commands(&LayoutMode::LegacyB, &default_agents(), "multi");
-    let has_claude = cmds
-        .iter()
-        .any(|c| c.contains("claude --dangerously-skip-permissions"));
-    assert!(has_claude, "esperado comando claude nos cmds: {:?}", cmds);
+    let has_kimi = cmds.iter().any(|c| c.contains("kimi --yolo"));
+    assert!(has_kimi, "esperado comando kimi nos cmds: {:?}", cmds);
 }
 
 #[test]
@@ -28,10 +26,10 @@ fn layout_b_sends_codex_command() {
 }
 
 #[test]
-fn layout_b_sends_cursor_command() {
+fn layout_b_sends_opencode_command() {
     let cmds = build_commands(&LayoutMode::LegacyB, &default_agents(), "multi");
-    let has_cursor = cmds.iter().any(|c| c.contains("agent"));
-    assert!(has_cursor);
+    let has_opencode = cmds.iter().any(|c| c.contains("opencode"));
+    assert!(has_opencode);
 }
 
 #[test]
@@ -47,12 +45,10 @@ fn layout_a_commands_start_with_new_session() {
 }
 
 #[test]
-fn layout_a_sends_claude_command() {
+fn layout_a_sends_codex_command() {
     let cmds = build_commands(&LayoutMode::LegacyA, &default_agents(), "multi");
-    let has_claude = cmds
-        .iter()
-        .any(|c| c.contains("claude --dangerously-skip-permissions"));
-    assert!(has_claude);
+    let has_codex = cmds.iter().any(|c| c.contains("codex --yolo"));
+    assert!(has_codex);
 }
 
 #[test]

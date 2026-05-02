@@ -47,11 +47,11 @@ fn free_pane_uses_shell_command_in_pty_mode() {
 #[test]
 fn agent_pane_runs_its_command_in_pty_mode() {
     let agents = Layout::B.default_agents();
-    let config = &agents[1]; // Claude
+    let config = &agents[1]; // Codex
     let command = command_for_pane(config);
 
-    assert_eq!(command.program, "claude");
-    assert_eq!(command.args, vec!["--dangerously-skip-permissions"]);
+    assert_eq!(command.program, "codex");
+    assert_eq!(command.args, vec!["--yolo"]);
 }
 
 #[test]
