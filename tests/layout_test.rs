@@ -1,6 +1,11 @@
 use clap::Parser;
-use multi_terminal::layout::{AgentConfig, AgentType, Layout, LayoutMode, LayoutType, SavedLayout};
-use multi_terminal::{parse_args, resolve_agents, resolve_runtime_args, resolve_working_dir, Args};
+use multi_terminal::layout::{
+    AgentConfig, AgentType, Command, Layout, LayoutMode, LayoutType, SavedLayout,
+};
+use multi_terminal::{
+    parse_args, resolve_agents, resolve_runtime_args, resolve_runtime_args_with_defaults,
+    resolve_working_dir, Args,
+};
 use std::path::Path;
 
 fn default_agents() -> Vec<AgentConfig> {
@@ -26,26 +31,26 @@ fn layout_b_pane0_has_no_command() {
 }
 
 #[test]
-fn layout_b_pane1_runs_codex() {
+fn layout_b_pane1_runs_opencode() {
     let panes = Layout::B.panes(&default_agents());
     let cmd = panes[1].effective_command().unwrap();
-    assert_eq!(cmd.program, "codex");
-    assert_eq!(cmd.args, vec!["--yolo"]);
+    assert_eq!(cmd.program, "opencode");
+    assert!(cmd.args.is_empty());
 }
 
 #[test]
-fn layout_b_pane2_runs_kimi() {
+fn layout_b_pane2_runs_grok() {
     let panes = Layout::B.panes(&default_agents());
     let cmd = panes[2].effective_command().unwrap();
-    assert_eq!(cmd.program, "kimi");
+    assert_eq!(cmd.program, "grok");
     assert_eq!(cmd.args, vec!["--yolo"]);
 }
 
 #[test]
-fn layout_b_pane3_runs_opencode() {
+fn layout_b_pane3_runs_agent() {
     let panes = Layout::B.panes(&default_agents());
     let cmd = panes[3].effective_command().unwrap();
-    assert_eq!(cmd.program, "opencode");
+    assert_eq!(cmd.program, "agent");
     assert!(cmd.args.is_empty());
 }
 
@@ -56,7 +61,7 @@ fn layout_a_pane0_is_free() {
 }
 
 #[test]
-fn default_layout_is_grid_with_6_panes_and_two_free_panes() {
+fn default_layout_opens_six_free_panes() {
     let resolved = resolve_runtime_args(&parse_args(&["multi-terminal"]), None).unwrap();
     assert_eq!(
         resolved.layout_mode,
@@ -66,19 +71,29 @@ fn default_layout_is_grid_with_6_panes_and_two_free_panes() {
         }
     );
     assert_eq!(resolved.agents.len(), 6);
-    assert!(resolved.agents[0].effective_command().is_none());
+    assert!(resolved
+        .agents
+        .iter()
+        .all(|agent| agent.effective_command().is_none()));
+}
+
+#[test]
+fn explicit_grid_six_keeps_agent_defaults() {
+    let args = parse_args(&["multi-terminal", "--layout-type", "grid", "--panes", "6"]);
+
+    let resolved = resolve_runtime_args(&args, None).unwrap();
+
     assert_eq!(
         resolved.agents[1].effective_command().unwrap().program,
-        "codex"
+        "opencode"
     );
     assert_eq!(
         resolved.agents[2].effective_command().unwrap().program,
-        "kimi"
+        "grok"
     );
-    assert!(resolved.agents[3].effective_command().is_none());
     assert_eq!(
         resolved.agents[4].effective_command().unwrap().program,
-        "opencode"
+        "agent"
     );
     assert_eq!(
         resolved.agents[5].effective_command().unwrap().program,
@@ -232,7 +247,7 @@ fn resolve_runtime_args_builds_dynamic_defaults() {
     assert!(resolved.agents[0].effective_command().is_none());
     assert_eq!(
         resolved.agents[1].effective_command().unwrap().program,
-        "codex"
+        "opencode"
     );
     assert_eq!(
         resolved.agents[4].effective_command().unwrap().program,
@@ -441,6 +456,100 @@ fn no_opencode_disables_fifth_default_pane() {
 }
 
 #[test]
+fn all_free_opens_default_six_panes_without_commands() {
+    let args = parse_args(&["multi-terminal", "--all-free"]);
+
+    let resolved = resolve_runtime_args(&args, None).unwrap();
+
+    assert_eq!(
+        resolved.layout_mode,
+        LayoutMode::Dynamic {
+            layout_type: LayoutType::Grid,
+            pane_count: 6,
+        }
+    );
+    assert_eq!(resolved.agents.len(), 6);
+    assert!(resolved
+        .agents
+        .iter()
+        .all(|agent| agent.effective_command().is_none()));
+}
+
+#[test]
+fn all_free_respects_dynamic_pane_count() {
+    let args = parse_args(&[
+        "multi-terminal",
+        "--layout-type",
+        "main-left",
+        "--panes",
+        "5",
+        "--all-free",
+    ]);
+
+    let resolved = resolve_runtime_args(&args, None).unwrap();
+
+    assert_eq!(resolved.agents.len(), 5);
+    assert!(resolved
+        .agents
+        .iter()
+        .all(|agent| agent.effective_command().is_none()));
+}
+
+#[test]
+fn all_free_applies_to_loaded_layout_agents() {
+    let args = parse_args(&["multi-terminal", "--all-free"]);
+    let loaded = SavedLayout {
+        layout: multi_terminal::layout::SavedLayoutKind::Legacy("b".to_string()),
+        agents: Layout::B.default_agents(),
+        maximize: false,
+    };
+
+    let resolved = resolve_runtime_args(&args, Some(loaded)).unwrap();
+
+    assert_eq!(resolved.agents.len(), 4);
+    assert!(resolved
+        .agents
+        .iter()
+        .all(|agent| agent.effective_command().is_none()));
+}
+
+#[test]
+fn all_free_keeps_explicit_pane_override() {
+    let args = parse_args(&[
+        "multi-terminal",
+        "--layout-type",
+        "grid",
+        "--panes",
+        "6",
+        "--all-free",
+        "--pane",
+        "2=htop",
+        "--title",
+        "2=Monitor",
+    ]);
+
+    let resolved = resolve_runtime_args(&args, None).unwrap();
+
+    assert_eq!(
+        resolved.agents[1].effective_command().unwrap().program,
+        "htop"
+    );
+    assert_eq!(resolved.agents[1].effective_title(), "Monitor");
+    assert!(resolved.agents[0].effective_command().is_none());
+    assert!(resolved.agents[5].effective_command().is_none());
+}
+
+#[test]
+fn args_parse_all_free_flags() {
+    let primary = parse_args(&["multi-terminal", "--all-free"]);
+    let alias = parse_args(&["multi-terminal", "--free"]);
+
+    assert!(primary.all_free);
+    assert!(alias.all_free);
+    assert!(!parse_args(&["multi-terminal"]).all_free);
+}
+
+#[test]
 fn args_parse_set_default_flag() {
     let args = parse_args(&["multi-terminal", "--set-default"]);
 
@@ -587,4 +696,35 @@ fn set_default_handles_corrupted_config_file_gracefully() {
     } else if path.exists() {
         std::fs::remove_file(&path).ok();
     }
+}
+
+#[test]
+fn persisted_old_stock_globals_are_auto_upgraded_to_free_panes() {
+    // Simulates a user who had --set-default in the past (capturing old codex/kimi/opencode@5 stock)
+    // After the global panes change, plain run should transparently get the new stock (free panes).
+    let args = parse_args(&["multi-terminal"]);
+    let old_stock = SavedLayout {
+        layout: multi_terminal::layout::SavedLayoutKind::Dynamic {
+            layout_type: LayoutType::Grid,
+            pane_count: 6,
+        },
+        agents: vec![
+            AgentConfig::new(AgentType::Shell),
+            AgentConfig::new(AgentType::Codex),
+            AgentConfig::new(AgentType::Custom("kimi".to_string()))
+                .with_command(Command::new("kimi", &["--yolo"])),
+            AgentConfig::new(AgentType::Shell),
+            AgentConfig::new(AgentType::OpenCode),
+            AgentConfig::new(AgentType::Custom("kilo".to_string())),
+        ],
+        maximize: true,
+    };
+
+    let resolved = resolve_runtime_args_with_defaults(&args, None, Some(old_stock)).unwrap();
+
+    assert_eq!(resolved.agents.len(), 6);
+    assert!(resolved
+        .agents
+        .iter()
+        .all(|agent| agent.effective_command().is_none()));
 }

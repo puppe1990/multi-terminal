@@ -155,19 +155,32 @@ impl LayoutMode {
         let count = self.pane_count();
         let mut agents = vec![AgentConfig::new(AgentType::Shell); count];
 
-        // Assign default agents based on position
+        // Assign "global" agent defaults.
+        // For the popular 6-pane grid default (used by plain `multi-terminal`),
+        // insert an extra free pane at index 3 (pane 4) so the third global agent
+        // (cursor/agent, which replaced the old opencode) lands on pane 5.
         if count > 1 {
-            agents[1] = AgentConfig::new(AgentType::Codex);
+            agents[1] = AgentConfig::new(AgentType::OpenCode);
         }
         if count > 2 {
-            agents[2] = AgentConfig::new(AgentType::Custom("kimi".to_string()))
-                .with_command(Command::new("kimi", &["--yolo"]));
+            agents[2] = AgentConfig::new(AgentType::Custom("grok".to_string()))
+                .with_command(Command::new("grok", &["--yolo"]));
         }
-        if count > 3 {
-            agents[3] = AgentConfig::new(AgentType::OpenCode);
-        }
-        if count > 4 {
-            agents[4] = AgentConfig::new(AgentType::Custom("kilo".to_string()));
+        if count == 6 {
+            if count > 4 {
+                agents[4] = AgentConfig::new(AgentType::Cursor);
+            }
+            if count > 5 {
+                agents[5] = AgentConfig::new(AgentType::Custom("kilo".to_string()));
+            }
+            // agents[3] deliberately left as Shell (free pane in the canonical 6-pane global layout)
+        } else {
+            if count > 3 {
+                agents[3] = AgentConfig::new(AgentType::Cursor);
+            }
+            if count > 4 {
+                agents[4] = AgentConfig::new(AgentType::Custom("kilo".to_string()));
+            }
         }
 
         agents
@@ -237,10 +250,10 @@ impl Layout {
     pub fn default_agents(&self) -> Vec<AgentConfig> {
         vec![
             AgentConfig::new(AgentType::Shell),
-            AgentConfig::new(AgentType::Codex),
-            AgentConfig::new(AgentType::Custom("kimi".to_string()))
-                .with_command(Command::new("kimi", &["--yolo"])),
             AgentConfig::new(AgentType::OpenCode),
+            AgentConfig::new(AgentType::Custom("grok".to_string()))
+                .with_command(Command::new("grok", &["--yolo"])),
+            AgentConfig::new(AgentType::Cursor),
         ]
     }
 
