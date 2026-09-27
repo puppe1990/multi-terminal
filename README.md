@@ -14,13 +14,8 @@ CLI em Rust para abrir múltiplos panes de terminal com agentes de IA e comandos
   - `main-left`
   - `main-top`
 - Aceita quantidade variável de panes com `--panes`
-- Inicia, por padrão (6 panes em grid):
-  - pane 1: shell livre
-  - pane 2: `codex --yolo`
-  - pane 3: `kimi --yolo`
-  - pane 4: shell livre
-  - pane 5: `opencode`
-  - pane 6: `kilo`
+- Inicia, por padrão (6 panes em grid 3 colunas x 2 linhas): todos os panes como shell livre
+- O mix de agentes (`opencode`, `grok --yolo`, `agent`, `kilo`) continua disponível em `--layout-type grid --panes 6`
 - Permite sobrescrever comando e título por índice
 - Permite persistir defaults globais via CLI com `--set-default`
 - Permite salvar layouts nomeados e recarregá-los depois
@@ -137,17 +132,27 @@ Se `--pane INDEX=...` for usado sem `--title INDEX=...`, o próprio comando vira
 
 ### Desabilitar agentes padrão
 
+Valem nas execuções com agentes, como `--layout-type grid --panes 6`:
+
 ```bash
-multi-terminal --no-codex
-multi-terminal --no-opencode
-multi-terminal --no-codex --no-opencode
+multi-terminal --layout-type grid --panes 6 --no-codex
+multi-terminal --layout-type grid --panes 6 --no-codex --no-opencode
 ```
 
 Essas flags substituem o pane correspondente por shell livre:
-- `--no-codex` desabilita o pane 2
-- `--no-opencode` desabilita o pane 5
+- `--no-claude` desabilita o pane 2 (`opencode`)
+- `--no-codex` desabilita o pane 3 (`grok`)
+- `--no-opencode` desabilita o pane 5 (`agent`)
+- `--no-cursor` desabilita o pane 4 (legado; já é livre no grid de 6)
 
-As flags legadas `--no-claude` e `--no-cursor` também continuam aceitas e afetam os panes 2 e 4 respectivamente.
+### Abrir todos os panes livres
+
+```bash
+multi-terminal --all-free
+multi-terminal --free --layout-type main-top --panes 7
+```
+
+`--all-free` (alias `--free`) ignora os agentes padrão e abre todos os panes como shell livre — o `multi-terminal` sem argumentos já abre assim. Overrides explícitos com `--pane INDEX=...` continuam valendo.
 
 ### Fechar o terminal atual
 
@@ -176,8 +181,8 @@ multi-terminal \
   --panes 5 \
   --pane 2="npm run dev" \
   --title 2=App \
-  --pane 5="opencode" \
-  --title 5=OpenCode
+  --pane 5="agent" \
+  --title 5=Cursor
 ```
 
 Precedência da configuração:

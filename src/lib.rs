@@ -6,7 +6,7 @@ pub mod terminal_app;
 pub mod tmux;
 
 use clap::{Parser, ValueHint};
-use layout::{AgentConfig, AgentType, Command, Layout, LayoutMode, LayoutType, SavedLayout};
+use layout::{AgentConfig, AgentType, Layout, LayoutMode, LayoutType, SavedLayout};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone)]
@@ -72,6 +72,10 @@ pub struct Args {
     /// Disable OpenCode agent
     #[arg(long)]
     pub no_opencode: bool,
+
+    /// Open every pane as a free shell
+    #[arg(long, alias = "free")]
+    pub all_free: bool,
 
     /// Custom command for pane 1 (top-left or left)
     #[arg(long)]
@@ -171,21 +175,12 @@ pub fn parse_args(args: &[&str]) -> Args {
 }
 
 fn hardcoded_startup_default() -> (LayoutMode, Vec<AgentConfig>) {
-    (
-        LayoutMode::Dynamic {
-            layout_type: LayoutType::Grid,
-            pane_count: 6,
-        },
-        vec![
-            AgentConfig::new(AgentType::Shell),
-            AgentConfig::new(AgentType::Codex),
-            AgentConfig::new(AgentType::Custom("kimi".to_string()))
-                .with_command(Command::new("kimi", &["--yolo"])),
-            AgentConfig::new(AgentType::Shell),
-            AgentConfig::new(AgentType::OpenCode),
-            AgentConfig::new(AgentType::Custom("kilo".to_string())),
-        ],
-    )
+    let layout_mode = LayoutMode::Dynamic {
+        layout_type: LayoutType::Grid,
+        pane_count: 6,
+    };
+    let agents = vec![AgentConfig::new(AgentType::Shell); layout_mode.pane_count()];
+    (layout_mode, agents)
 }
 
 pub fn resolve_agents(
@@ -212,6 +207,10 @@ pub fn resolve_agents(
     }
     if args.no_cursor {
         agents[3] = AgentConfig::new(AgentType::Shell);
+    }
+
+    if args.all_free {
+        agents = vec![AgentConfig::new(AgentType::Shell); agents.len()];
     }
 
     // Apply --paneN custom commands
@@ -277,6 +276,10 @@ pub fn resolve_agents_dynamic(
     }
     if pane_count > 4 && args.no_opencode {
         agents[4] = AgentConfig::new(AgentType::Shell);
+    }
+
+    if args.all_free {
+        agents = vec![AgentConfig::new(AgentType::Shell); pane_count];
     }
 
     // Apply --paneN custom commands (only for first 4 panes)
@@ -365,11 +368,45 @@ pub fn resolve_runtime_args_with_defaults(
     saved: Option<SavedLayout>,
     persisted_default: Option<SavedLayout>,
 ) -> Result<RuntimeArgs, String> {
-    let saved = match saved {
+    let mut saved = match saved {
         Some(saved) => Some(saved),
         None if !args_define_layout(args) => persisted_default,
         None => None,
     };
+
+    // Auto-migrate persisted defaults that exactly match a past global stock
+    // (codex/kimi at 2/3, opencode at pane 5). This makes "altere os panes globais"
+    // take effect for users who had previously persisted the old defaults via --set-default,
+    // without requiring them to delete ~/.config/multi-terminal/default.json.
+    // The new global stock is free panes, so migrated configs are reset to shells.
+    if let Some(ref mut s) = saved {
+        let progs: Vec<Option<String>> = s
+            .agents
+            .iter()
+            .map(|a| a.effective_command().map(|c| c.to_shell_string()))
+            .collect();
+        let is_old_stock_6 = progs.len() == 6
+            && progs[0].is_none()
+            && progs[1].as_deref() == Some("codex --yolo")
+            && progs[2].as_deref() == Some("kimi --yolo")
+            && progs[3].is_none()
+            && progs[4].as_deref() == Some("opencode")
+            && progs[5].as_deref() == Some("kilo");
+        let is_old_stock_5 = progs.len() == 5
+            && progs[0].is_none()
+            && progs[1].as_deref() == Some("codex --yolo")
+            && progs[2].as_deref() == Some("kimi --yolo")
+            && progs[3].as_deref() == Some("opencode")
+            && progs[4].as_deref() == Some("kilo");
+        let is_old_stock_4 = progs.len() == 4
+            && progs[0].is_none()
+            && progs[1].as_deref() == Some("codex --yolo")
+            && progs[2].as_deref() == Some("kimi --yolo")
+            && progs[3].as_deref() == Some("opencode");
+        if is_old_stock_6 || is_old_stock_5 || is_old_stock_4 {
+            s.agents = vec![AgentConfig::new(AgentType::Shell); s.agents.len()];
+        }
+    }
 
     let (layout_mode, base_agents, maximize) = match saved {
         Some(saved) => {

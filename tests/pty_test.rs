@@ -47,11 +47,11 @@ fn free_pane_uses_shell_command_in_pty_mode() {
 #[test]
 fn agent_pane_runs_its_command_in_pty_mode() {
     let agents = Layout::B.default_agents();
-    let config = &agents[1]; // Codex
+    let config = &agents[1]; // OpenCode
     let command = command_for_pane(config);
 
-    assert_eq!(command.program, "codex");
-    assert_eq!(command.args, vec!["--yolo"]);
+    assert_eq!(command.program, "opencode");
+    assert!(command.args.is_empty());
 }
 
 #[test]

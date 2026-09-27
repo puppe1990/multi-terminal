@@ -12,24 +12,24 @@ fn layout_b_commands_start_with_new_session() {
 }
 
 #[test]
-fn layout_b_sends_kimi_command() {
-    let cmds = build_commands(&LayoutMode::LegacyB, &default_agents(), "multi");
-    let has_kimi = cmds.iter().any(|c| c.contains("kimi --yolo"));
-    assert!(has_kimi, "esperado comando kimi nos cmds: {:?}", cmds);
-}
-
-#[test]
-fn layout_b_sends_codex_command() {
-    let cmds = build_commands(&LayoutMode::LegacyB, &default_agents(), "multi");
-    let has_codex = cmds.iter().any(|c| c.contains("codex --yolo"));
-    assert!(has_codex);
-}
-
-#[test]
 fn layout_b_sends_opencode_command() {
     let cmds = build_commands(&LayoutMode::LegacyB, &default_agents(), "multi");
     let has_opencode = cmds.iter().any(|c| c.contains("opencode"));
     assert!(has_opencode);
+}
+
+#[test]
+fn layout_b_sends_grok_command() {
+    let cmds = build_commands(&LayoutMode::LegacyB, &default_agents(), "multi");
+    let has_grok = cmds.iter().any(|c| c.contains("grok --yolo"));
+    assert!(has_grok, "esperado comando grok nos cmds: {:?}", cmds);
+}
+
+#[test]
+fn layout_b_sends_agent_command() {
+    let cmds = build_commands(&LayoutMode::LegacyB, &default_agents(), "multi");
+    let has_agent = cmds.iter().any(|c| c.contains("'agent'"));
+    assert!(has_agent);
 }
 
 #[test]
@@ -45,10 +45,10 @@ fn layout_a_commands_start_with_new_session() {
 }
 
 #[test]
-fn layout_a_sends_codex_command() {
+fn layout_a_sends_opencode_command() {
     let cmds = build_commands(&LayoutMode::LegacyA, &default_agents(), "multi");
-    let has_codex = cmds.iter().any(|c| c.contains("codex --yolo"));
-    assert!(has_codex);
+    let has_opencode = cmds.iter().any(|c| c.contains("opencode"));
+    assert!(has_opencode);
 }
 
 #[test]
@@ -58,6 +58,14 @@ fn build_commands_supports_dynamic_grid_layout() {
         pane_count: 6,
     };
     let agents = layout.default_agents();
+
+    // Verify global panes for --layout-type grid --panes 6 also place the cursor/agent on pane 5 (index 4)
+    assert!(agents[0].effective_command().is_none());
+    assert_eq!(agents[1].effective_command().unwrap().program, "opencode");
+    assert_eq!(agents[2].effective_command().unwrap().program, "grok");
+    assert!(agents[3].effective_command().is_none());
+    assert_eq!(agents[4].effective_command().unwrap().program, "agent");
+    assert_eq!(agents[5].effective_command().unwrap().program, "kilo");
 
     let cmds = build_commands(&layout, &agents, "test-session");
 
